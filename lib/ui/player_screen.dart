@@ -29,8 +29,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
   List<Track> _upNextTracks = [];
   bool _isLoadingUpNext = false;
+  bool _isLoadingMoreUpNext = false;
 
   StreamSubscription<Track?>? _trackSub;
+  StreamSubscription<List<Track>>? _queueSub;
 
   @override
   void initState() {
@@ -40,9 +42,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       ..repeat(min: 0.0, max: 1.0, period: const Duration(milliseconds: 1200));
 
     _loadLyrics(_activeTrack!);
-    _loadUpNext(_activeTrack!);
 
-    // Listen to live track changes if a new track is selected
+    // If AudioPlayerService already has a populated queue, use it; otherwise generate fresh
+    if (_audioService.queue.isNotEmpty) {
+      _upNextTracks = List.from(_audioService.queue);
+    } else {
+      _loadUpNext(_activeTrack!);
+    }
+
+    // Listen to live track changes if a new track is selected or auto-played
     _trackSub = _audioService.currentTrackStream.listen((newTrack) {
       if (newTrack != null && newTrack.id != _activeTrack?.id) {
         if (mounted) {
@@ -52,8 +60,16 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             _isLoadingLyrics = true;
           });
           _loadLyrics(newTrack);
-          _loadUpNext(newTrack);
         }
+      }
+    });
+
+    // Listen to queue updates from AudioPlayerService
+    _queueSub = _audioService.queueStream.listen((updatedQueue) {
+      if (mounted) {
+        setState(() {
+          _upNextTracks = List.from(updatedQueue);
+        });
       }
     });
   }
@@ -61,6 +77,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   @override
   void dispose() {
     _trackSub?.cancel();
+    _queueSub?.cancel();
     _shimmerController.dispose();
     _exploreService.dispose();
     super.dispose();
@@ -71,11 +88,27 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       _isLoadingUpNext = true;
     });
 
-    final queue = await _exploreService.getUpNextQueue(track, limit: 20);
+    final queue = await _exploreService.getUpNextQueue(track, limit: 25);
     if (mounted) {
       setState(() {
         _upNextTracks = queue;
         _isLoadingUpNext = false;
+      });
+      _audioService.setQueue(queue);
+    }
+  }
+
+  Future<void> _loadMoreUpNext() async {
+    if (_isLoadingMoreUpNext || _activeTrack == null) return;
+    setState(() {
+      _isLoadingMoreUpNext = true;
+    });
+
+    final more = await _exploreService.getUpNextQueue(_activeTrack!, limit: 20);
+    if (mounted) {
+      _audioService.appendToQueue(more);
+      setState(() {
+        _isLoadingMoreUpNext = false;
       });
     }
   }
@@ -245,66 +278,90 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                   style: TextStyle(color: AppTheme.textSecondary),
                                 ),
                               )
-                            : ListView.builder(
-                                controller: scrollController,
-                                itemCount: _upNextTracks.length,
-                                itemBuilder: (context, index) {
-                                  final track = _upNextTracks[index];
-                                  return ListTile(
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 2,
-                                    ),
-                                    leading: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: track.thumbnailUrl != null
-                                          ? Image.network(
-                                              track.thumbnailUrl!,
-                                              width: 46,
-                                              height: 46,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, _, _) => Container(
+                            : NotificationListener<ScrollNotification>(
+                                onNotification: (ScrollNotification scrollInfo) {
+                                  if (scrollInfo.metrics.pixels >=
+                                      scrollInfo.metrics.maxScrollExtent - 200) {
+                                    _loadMoreUpNext();
+                                  }
+                                  return false;
+                                },
+                                child: ListView.builder(
+                                  controller: scrollController,
+                                  itemCount: _upNextTracks.length + (_isLoadingMoreUpNext ? 1 : 0),
+                                  itemBuilder: (context, index) {
+                                    if (index == _upNextTracks.length) {
+                                      return const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 16),
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              color: AppTheme.accentLime,
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    final track = _upNextTracks[index];
+                                    return ListTile(
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 2,
+                                      ),
+                                      leading: ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: track.thumbnailUrl != null
+                                            ? Image.network(
+                                                track.thumbnailUrl!,
+                                                width: 46,
+                                                height: 46,
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, _, _) => Container(
+                                                  width: 46,
+                                                  height: 46,
+                                                  color: AppTheme.surfaceLight,
+                                                ),
+                                              )
+                                            : Container(
                                                 width: 46,
                                                 height: 46,
                                                 color: AppTheme.surfaceLight,
                                               ),
-                                            )
-                                          : Container(
-                                              width: 46,
-                                              height: 46,
-                                              color: AppTheme.surfaceLight,
-                                            ),
-                                    ),
-                                    title: Text(
-                                      track.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: AppTheme.textPrimary,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
                                       ),
-                                    ),
-                                    subtitle: Text(
-                                      track.artist,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
+                                      title: Text(
+                                        track.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: AppTheme.textPrimary,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        track.artist,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: AppTheme.textSecondary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      trailing: const Icon(
+                                        Icons.play_arrow_rounded,
                                         color: AppTheme.textSecondary,
-                                        fontSize: 12,
+                                        size: 24,
                                       ),
-                                    ),
-                                    trailing: const Icon(
-                                      Icons.play_arrow_rounded,
-                                      color: AppTheme.textSecondary,
-                                      size: 24,
-                                    ),
-                                    onTap: () {
-                                      Navigator.pop(ctx);
-                                      _audioService.playTrack(track);
-                                    },
-                                  );
-                                },
+                                      onTap: () {
+                                        Navigator.pop(ctx);
+                                        _audioService.playTrack(track);
+                                      },
+                                    );
+                                  },
+                                ),
                               ),
                   ),
                 ],
