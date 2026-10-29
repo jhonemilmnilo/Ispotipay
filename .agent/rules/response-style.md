@@ -19,3 +19,4 @@ trigger: always_on
 
 - **Strict Approval Gate**: Do NOT provide or write any code yet unless the user explicitly types **"Proceed"** or **"Lets implement it"**.
 - Always propose the plan first, then wait for explicit confirmation.
+
