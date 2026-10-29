@@ -46,26 +46,24 @@ class _PlayerScreenState extends State<PlayerScreen> {
     }
   }
 
-  void _syncLyrics(Duration currentPosition) {
-    if (_lyrics.isEmpty) return;
-
-    int newIndex = 0;
+  int _findActiveLineIndex(Duration currentPosition) {
+    if (_lyrics.isEmpty) return 0;
+    int index = 0;
     for (int i = 0; i < _lyrics.length; i++) {
       if (currentPosition >= _lyrics[i].timestamp) {
-        newIndex = i;
+        index = i;
       } else {
         break;
       }
     }
+    return index;
+  }
 
-    if (newIndex != _activeLineIndex) {
-      setState(() {
-        _activeLineIndex = newIndex;
-      });
-
-      // Smooth auto-scroll to current lyric line
+  void _scrollToActiveLine(int index) {
+    if (index != _activeLineIndex) {
+      _activeLineIndex = index;
       if (_lyricsScrollController.hasClients) {
-        final targetOffset = (_activeLineIndex * 48.0) - 100.0;
+        final targetOffset = (index * 48.0) - 100.0;
         _lyricsScrollController.animateTo(
           targetOffset.clamp(0.0, _lyricsScrollController.position.maxScrollExtent),
           duration: const Duration(milliseconds: 300),
@@ -169,7 +167,14 @@ class _PlayerScreenState extends State<PlayerScreen> {
                           stream: _audioService.positionStream,
                           builder: (context, snapshot) {
                             final currentPosition = snapshot.data ?? Duration.zero;
-                            _syncLyrics(currentPosition);
+                            final activeIndex = _findActiveLineIndex(currentPosition);
+
+                            // Schedule smooth scroll without mutating state during build
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) {
+                                _scrollToActiveLine(activeIndex);
+                              }
+                            });
 
                             return ListView.builder(
                               controller: _lyricsScrollController,
@@ -177,7 +182,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                               itemCount: _lyrics.length,
                               itemBuilder: (context, index) {
                                 final line = _lyrics[index];
-                                final isCurrent = index == _activeLineIndex;
+                                final isCurrent = index == activeIndex;
 
                                 return Padding(
                                   padding: const EdgeInsets.symmetric(vertical: 8),
