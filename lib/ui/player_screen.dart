@@ -98,49 +98,40 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.textPrimary, size: 30),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'Now Playing',
-          style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _activeTrack?.title ?? widget.track.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              _activeTrack?.artist ?? widget.track.artist,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
         centerTitle: true,
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // Top Section: Track Info (Centered, No Thumbnail)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              child: Column(
-                children: [
-                  Text(
-                    _activeTrack?.title ?? widget.track.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _activeTrack?.artist ?? widget.track.artist,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const Divider(color: AppTheme.divider, height: 24),
+            const Divider(color: AppTheme.divider, height: 16),
 
             // Middle Section: Strict Center-Locked Sliding Teleprompter Lyrics
             Expanded(
