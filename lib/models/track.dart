@@ -89,3 +89,4 @@ class Track {
   factory Track.fromJson(String source) =>
       Track.fromMap(json.decode(source) as Map<String, dynamic>);
 }
+
