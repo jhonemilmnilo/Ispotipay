@@ -36,7 +36,7 @@ class LyricsService {
     return lines;
   }
 
-  /// Fetch lyrics: Checks local file first (offline support), then fetches from LRCLIB
+  /// Fetch lyrics: Checks local file first (offline support), then multi-tier LRCLIB query
   Future<List<LyricLine>> getLyrics(Track track) async {
     // 1. Check local file if track is downloaded
     if (track.lyricsPath != null && track.lyricsPath!.isNotEmpty) {
@@ -47,16 +47,17 @@ class LyricsService {
       }
     }
 
-    // 2. Fetch from LRCLIB online API
-    try {
-      final cleanTitle = Uri.encodeComponent(
-        track.title.replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '').trim(),
-      );
-      final cleanArtist = Uri.encodeComponent(track.artist.trim());
-      final durationSeconds = (track.durationMs / 1000).round();
+    final cleanTitle = Uri.encodeComponent(
+      track.title.replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '').trim(),
+    );
+    final cleanArtist = Uri.encodeComponent(
+      track.artist.split(RegExp(r'[,&]')).first.trim(),
+    );
 
+    // 2. Tier 1: Try direct match without strict duration constraint
+    try {
       final url = Uri.parse(
-        'https://lrclib.net/api/get?track_name=$cleanTitle&artist_name=$cleanArtist&duration=$durationSeconds',
+        'https://lrclib.net/api/get?track_name=$cleanTitle&artist_name=$cleanArtist',
       );
 
       final response = await http.get(url, headers: {
@@ -69,19 +70,40 @@ class LyricsService {
         if (syncedLyrics != null && syncedLyrics.isNotEmpty) {
           return parseLrc(syncedLyrics);
         }
+      }
+    } catch (_) {}
 
-        // Fallback to plain lyrics if synced not available
-        final plainLyrics = data['plainLyrics'] as String?;
-        if (plainLyrics != null && plainLyrics.isNotEmpty) {
-          return const LineSplitter()
-              .convert(plainLyrics)
-              .map((line) => LyricLine(timestamp: Duration.zero, text: line))
-              .toList();
+    // 3. Tier 2: Search fallback (resolves remixes, featuring artists, and catalog discrepancies)
+    try {
+      final searchUrl = Uri.parse(
+        'https://lrclib.net/api/search?q=$cleanTitle+$cleanArtist',
+      );
+
+      final searchResponse = await http.get(searchUrl, headers: {
+        'User-Agent': 'ispotipay-music-player (v1.0.0)',
+      }).timeout(const Duration(seconds: 4));
+
+      if (searchResponse.statusCode == 200) {
+        final results = json.decode(searchResponse.body) as List;
+        for (final item in results) {
+          final syncedLyrics = item['syncedLyrics'] as String?;
+          if (syncedLyrics != null && syncedLyrics.isNotEmpty) {
+            return parseLrc(syncedLyrics);
+          }
+        }
+
+        // Fallback to plain lyrics if synced isn't available
+        for (final item in results) {
+          final plainLyrics = item['plainLyrics'] as String?;
+          if (plainLyrics != null && plainLyrics.isNotEmpty) {
+            return const LineSplitter()
+                .convert(plainLyrics)
+                .map((line) => LyricLine(timestamp: Duration.zero, text: line))
+                .toList();
+          }
         }
       }
-    } catch (_) {
-      // Graceful network timeout / parse failure
-    }
+    } catch (_) {}
 
     return [];
   }
