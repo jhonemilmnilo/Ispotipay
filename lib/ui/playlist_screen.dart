@@ -280,6 +280,10 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
               }
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.play_circle_fill, color: AppTheme.accentLime, size: 28),
+            onPressed: () => _playTrack(track),
+          ),
         ],
       ),
     );
