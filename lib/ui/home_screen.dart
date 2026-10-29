@@ -24,11 +24,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final ScrollController _playlistScrollController = ScrollController();
+  final ScrollController _topMusicScrollController = ScrollController();
   late AnimationController _shimmerController;
 
   Timer? _debounceTimer;
 
-  List<Track> _topMusic = [];
+  final List<Track> _topMusic = [];
   final List<Playlist> _topPlaylists = [];
   List<Track> _recents = [];
   List<Track> _favorites = [];
@@ -36,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   final List<Track> _allMusic = [];
 
   bool _isLoadingTop = true;
+  bool _isLoadingMoreTop = false;
   bool _isLoadingPlaylists = true;
   bool _isLoadingMorePlaylists = false;
   bool _isLoadingAll = true;
@@ -43,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _isSearching = false;
   List<Track> _searchResults = [];
   int _playlistOffset = 0;
+  int _topMusicOffset = 0;
 
   @override
   void initState() {
@@ -52,6 +55,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     _scrollController.addListener(_onScroll);
     _playlistScrollController.addListener(_onPlaylistScroll);
+    _topMusicScrollController.addListener(_onTopMusicScroll);
     _loadAllSections();
   }
 
@@ -61,9 +65,43 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _searchController.dispose();
     _scrollController.dispose();
     _playlistScrollController.dispose();
+    _topMusicScrollController.dispose();
     _shimmerController.dispose();
     _exploreService.dispose();
     super.dispose();
+  }
+
+  void _onTopMusicScroll() {
+    if (_topMusicScrollController.position.pixels >=
+        _topMusicScrollController.position.maxScrollExtent - 200) {
+      if (!_isLoadingMoreTop) {
+        _loadMoreTopMusic();
+      }
+    }
+  }
+
+  Future<void> _loadMoreTopMusic() async {
+    setState(() {
+      _isLoadingMoreTop = true;
+    });
+
+    final newTracks = await _exploreService.getTopMusic(
+      offset: _topMusicOffset,
+      limit: 15,
+    );
+
+    if (mounted) {
+      setState(() {
+        final existingIds = _topMusic.map((t) => t.id).toSet();
+        for (final t in newTracks) {
+          if (!existingIds.contains(t.id)) {
+            _topMusic.add(t);
+          }
+        }
+        _topMusicOffset += newTracks.length;
+        _isLoadingMoreTop = false;
+      });
+    }
   }
 
   void _onPlaylistScroll() {
@@ -152,13 +190,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _fetchOnlineMusic() async {
-    final top = await _exploreService.getTopMusic(limit: 15);
+    _topMusicOffset = 0;
+    final top = await _exploreService.getTopMusic(offset: 0, limit: 15);
     final all = await _exploreService.fetchNextAllMusicBatch(batchSize: 25);
     final playlists = _exploreService.getTopPlaylists(offset: 0, limit: 15);
 
     if (mounted) {
       setState(() {
-        _topMusic = top;
+        _topMusic.clear();
+        _topMusic.addAll(top);
+        _topMusicOffset = top.length;
+
         _topPlaylists.clear();
         _topPlaylists.addAll(playlists);
         _playlistOffset = playlists.length;
@@ -216,48 +258,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        RichText(
-                          text: const TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'IsPo',
-                                style: TextStyle(
-                                  color: AppTheme.textPrimary,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              TextSpan(
-                                text: 'TiPay',
-                                style: TextStyle(
-                                  color: AppTheme.accentLime,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.primary),
-                          ),
-                          child: const Text(
-                            'FREE & NO ADS',
+                    RichText(
+                      text: const TextSpan(
+                        children: [
+                          TextSpan(
+                            text: 'IsPo',
                             style: TextStyle(
-                              color: AppTheme.accentLime,
-                              fontSize: 10,
+                              color: AppTheme.textPrimary,
+                              fontSize: 26,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ),
-                      ],
+                          TextSpan(
+                            text: 'TiPay',
+                            style: TextStyle(
+                              color: AppTheme.accentLime,
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     _buildSearchBar(),
@@ -291,17 +312,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               ),
             ] else ...[
-              // 2. Top Music Section (Horizontal Carousel)
+              // 2. Top Music Section (Horizontal Carousel with Infinite Scroll)
               SliverToBoxAdapter(
                 child: _buildSectionHeader('Top Music', icon: Icons.trending_up),
               ),
               SliverToBoxAdapter(
-                child: _buildHorizontalCarousel(
-                  tracks: _topMusic,
-                  isLoading: _isLoadingTop,
-                  cardWidth: 150,
-                  cardHeight: 200,
-                ),
+                child: _buildTopMusicCarousel(),
               ),
 
               // 3. Recent Played Section (Horizontal Carousel, Max 15)
@@ -600,6 +616,110 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           ),
                         ),
                     ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTopMusicCarousel() {
+    if (_isLoadingTop) {
+      return SizedBox(
+        height: 200,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: 4,
+          itemBuilder: (context, index) => _buildShimmerCard(),
+        ),
+      );
+    }
+
+    if (_topMusic.isEmpty) {
+      return const SizedBox(
+        height: 200,
+        child: Center(
+          child: Text(
+            'No top music found',
+            style: TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 200,
+      child: ListView.builder(
+        controller: _topMusicScrollController,
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: _topMusic.length + (_isLoadingMoreTop ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == _topMusic.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(color: AppTheme.accentLime, strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+
+          final track = _topMusic[index];
+          return GestureDetector(
+            onTap: () {
+              _playTrack(track);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => PlayerScreen(track: track)),
+              );
+            },
+            child: Container(
+              width: 150,
+              margin: const EdgeInsets.symmetric(horizontal: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AspectRatio(
+                    aspectRatio: 1,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: track.thumbnailUrl != null
+                          ? Image.network(
+                              track.thumbnailUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => _buildFallbackThumbnail(),
+                            )
+                          : _buildFallbackThumbnail(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    track.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    track.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 11,
+                    ),
                   ),
                 ],
               ),

@@ -4,10 +4,12 @@ import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart' hide Playlist;
 import '../models/playlist.dart';
 import '../models/track.dart';
+import 'recommendation_engine.dart';
 
 class MusicExploreService {
   final YoutubeExplode _yt = YoutubeExplode();
   final http.Client _httpClient = http.Client();
+  final RecommendationEngine _recEngine = RecommendationEngine();
 
   int _pageOffset = 0;
 
@@ -352,10 +354,13 @@ class MusicExploreService {
     return [];
   }
 
-  /// Get Official Top Hits from iTunes Top Songs Chart (Philippines + Global)
-  Future<List<Track>> getTopMusic({int limit = 15}) async {
+  /// Get Official Top Hits with infinite paginated scrolling (15 per chunk) across country feeds
+  Future<List<Track>> getTopMusic({int offset = 0, int limit = 15}) async {
+    final countryFeeds = ['ph', 'us', 'gb', 'jp', 'kr'];
+    final country = countryFeeds[(offset ~/ limit) % countryFeeds.length];
+
     try {
-      final url = Uri.parse('https://itunes.apple.com/ph/rss/topsongs/limit=$limit/json');
+      final url = Uri.parse('https://itunes.apple.com/$country/rss/topsongs/limit=50/json');
       final response = await _httpClient.get(url).timeout(const Duration(seconds: 5));
 
       if (response.statusCode == 200) {
@@ -364,7 +369,7 @@ class MusicExploreService {
         final entries = feed?['entry'] as List?;
 
         if (entries != null) {
-          return entries.map((e) {
+          final mapped = entries.map((e) {
             final id = e['id']?['attributes']?['im:id']?.toString() ??
                 e['im:name']?['label']?.hashCode.toString() ??
                 '';
@@ -383,6 +388,11 @@ class MusicExploreService {
               thumbnailUrl: artworkUrl,
             );
           }).toList();
+
+          final start = (offset % 50);
+          final chunk = mapped.skip(start).take(limit).toList();
+          if (chunk.isNotEmpty) return chunk;
+          return mapped.take(limit).toList();
         }
       }
     } catch (_) {}
@@ -390,45 +400,15 @@ class MusicExploreService {
     return [];
   }
 
-  /// Paginated infinite scroll for "All Music" with 25-item chunks
+  /// Algorithm-based recommended infinite scroll for "All Music" with 25-item chunks
   Future<List<Track>> fetchNextAllMusicBatch({int batchSize = 25}) async {
-    final searchTerms = ['pop hits', 'opm hits', 'top trending', 'acoustic hits', 'rnb hits'];
-    final term = searchTerms[(_pageOffset ~/ batchSize) % searchTerms.length];
-    final offset = _pageOffset % 100;
+    final chunkIndex = _pageOffset ~/ batchSize;
     _pageOffset += batchSize;
 
-    try {
-      final encoded = Uri.encodeComponent(term);
-      final url = Uri.parse(
-        'https://itunes.apple.com/search?term=$encoded&entity=song&limit=$batchSize&offset=$offset',
-      );
+    // Use AI/taste recommendation engine based on user favorites and play history
+    final query = await _recEngine.getRecommendedQuery(chunkIndex);
 
-      final response = await _httpClient.get(url).timeout(const Duration(seconds: 5));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        final results = data['results'] as List;
-
-        return results.map((item) {
-          final trackId = item['trackId'].toString();
-          final title = item['trackName'] as String? ?? 'Unknown Title';
-          final artist = item['artistName'] as String? ?? 'Unknown Artist';
-          final album = item['collectionName'] as String?;
-          final durationMs = (item['trackTimeMillis'] as num?)?.toInt() ?? 0;
-          final artworkUrl = (item['artworkUrl100'] as String?)?.replaceAll('100x100bb', '600x600bb');
-
-          return Track(
-            id: trackId,
-            title: title,
-            artist: artist,
-            album: album,
-            durationMs: durationMs,
-            thumbnailUrl: artworkUrl,
-          );
-        }).toList();
-      }
-    } catch (_) {}
-
-    return [];
+    return await searchTracks(query, limit: batchSize);
   }
 
   /// Resolve exact matching playable stream URL with strict 0-delay duration delta ranking
