@@ -85,11 +85,17 @@ class RecommendationEngine {
     return queries;
   }
 
-  /// Interleave tracks round-robin style so that no adjacent tracks share the same artist
-  List<Track> interleaveDiverseArtists(List<List<Track>> trackLists, {int limit = 25}) {
+  /// Interleave tracks round-robin style
+  /// If [strictUniqueArtists] is true, exactly 1 song maximum per artist is selected
+  List<Track> interleaveDiverseArtists(
+    List<List<Track>> trackLists, {
+    int limit = 25,
+    bool strictUniqueArtists = false,
+  }) {
     final List<Track> interleaved = [];
     final Set<String> seenTrackIds = {};
     final Set<String> seenTitles = {};
+    final Set<String> seenArtists = {};
     String lastArtist = '';
 
     int maxLen = 0;
@@ -103,31 +109,49 @@ class RecommendationEngine {
         if (depth < list.length) {
           final track = list[depth];
           final cleanTitle = track.title.toLowerCase().trim();
-          final artistName = track.artist.toLowerCase().trim();
+          final artistKey = track.artist.toLowerCase().split(RegExp(r'[,&]')).first.trim();
 
-          // Ensure deduplication & no immediate back-to-back artist
-          if (!seenTrackIds.contains(track.id) &&
-              !seenTitles.contains(cleanTitle) &&
-              artistName != lastArtist) {
-            seenTrackIds.add(track.id);
-            seenTitles.add(cleanTitle);
-            interleaved.add(track);
-            lastArtist = artistName;
+          if (seenTrackIds.contains(track.id) || seenTitles.contains(cleanTitle)) {
+            continue;
+          }
+
+          if (strictUniqueArtists) {
+            // Strictly enforce only 1 song per distinct artist
+            if (!seenArtists.contains(artistKey)) {
+              seenTrackIds.add(track.id);
+              seenTitles.add(cleanTitle);
+              seenArtists.add(artistKey);
+              interleaved.add(track);
+            }
+          } else {
+            // Avoid contiguous back-to-back songs by the same artist
+            if (artistKey != lastArtist) {
+              seenTrackIds.add(track.id);
+              seenTitles.add(cleanTitle);
+              interleaved.add(track);
+              lastArtist = artistKey;
+            }
           }
         }
       }
       if (interleaved.length >= limit) break;
     }
 
-    // Second pass fill-up if strict artist spacing filtered too many
+    // Second pass fill-up if strict spacing filtered too many
     if (interleaved.length < limit) {
       for (final list in trackLists) {
         for (final track in list) {
           if (interleaved.length >= limit) break;
           final cleanTitle = track.title.toLowerCase().trim();
+          final artistKey = track.artist.toLowerCase().split(RegExp(r'[,&]')).first.trim();
+
           if (!seenTrackIds.contains(track.id) && !seenTitles.contains(cleanTitle)) {
+            if (strictUniqueArtists && seenArtists.contains(artistKey)) {
+              continue;
+            }
             seenTrackIds.add(track.id);
             seenTitles.add(cleanTitle);
+            seenArtists.add(artistKey);
             interleaved.add(track);
           }
         }

@@ -418,17 +418,22 @@ class MusicExploreService {
     return _recEngine.interleaveDiverseArtists(fetchedLists, limit: batchSize);
   }
 
-  /// Get Personalized "Recommended for You" tracks (capped at 20, refreshed based on listens)
+  /// Get Personalized "Recommended for You" tracks (capped at 20, strictly 1 song per unique artist)
   Future<List<Track>> getRecommendedTracks({int limit = 20}) async {
+    // Query 15 diverse seed queries to guarantee at least 20 unique artists
     final seedQueries = await _recEngine.getMultiSeedQueries(
-      count: 5,
+      count: 15,
       offsetIndex: DateTime.now().minute,
     );
 
-    final futureResults = seedQueries.map((q) => searchTracks(q, limit: 8));
+    final futureResults = seedQueries.map((q) => searchTracks(q, limit: 5));
     final fetchedLists = await Future.wait(futureResults);
 
-    return _recEngine.interleaveDiverseArtists(fetchedLists, limit: limit);
+    return _recEngine.interleaveDiverseArtists(
+      fetchedLists,
+      limit: limit,
+      strictUniqueArtists: true,
+    );
   }
 
   /// Resolve exact matching playable stream URL with strict 0-delay duration delta ranking
