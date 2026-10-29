@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/track.dart';
 import 'database_service.dart';
+import 'music_explore_service.dart';
 
 class DownloadService {
   static final DownloadService _instance = DownloadService._internal();
@@ -14,6 +15,7 @@ class DownloadService {
 
   final YoutubeExplode _yt = YoutubeExplode();
   final DatabaseService _dbService = DatabaseService();
+  final MusicExploreService _exploreService = MusicExploreService();
 
   /// Download both the audio stream (.m4a) and the companion synchronized lyrics (.lrc)
   Future<Track?> downloadTrack(
@@ -32,26 +34,35 @@ class DownloadService {
       final audioFilePath = p.join(tracksDir.path, '$safeId.m4a');
       final lyricsFilePath = p.join(lyricsDir.path, '$safeId.lrc');
 
-      // 1. Fetch & Download Audio Stream
-      final manifest = await _yt.videos.streamsClient.getManifest(track.id);
-      final streamInfo = manifest.audioOnly.withHighestBitrate();
-      final audioStream = _yt.videos.streamsClient.get(streamInfo);
+      // 1. Resolve exact audio stream via MusicExploreService
+      final streamUrl = await _exploreService.getAudioStreamUrl(
+        track.id,
+        title: track.title,
+        artist: track.artist,
+      );
+
+      if (streamUrl == null) return null;
 
       final audioFile = File(audioFilePath);
-      final output = audioFile.openWrite();
+      final client = http.Client();
+      final request = http.Request('GET', Uri.parse(streamUrl));
+      final response = await client.send(request);
 
-      final totalBytes = streamInfo.size.totalBytes;
+      final totalBytes = response.contentLength ?? 0;
       int downloadedBytes = 0;
+      final sink = audioFile.openWrite();
 
-      await for (final chunk in audioStream) {
-        output.add(chunk);
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
         downloadedBytes += chunk.length;
         if (totalBytes > 0 && onProgress != null) {
           onProgress(downloadedBytes / totalBytes);
         }
       }
-      await output.flush();
-      await output.close();
+
+      await sink.flush();
+      await sink.close();
+      client.close();
 
       // 2. Fetch & Save Companion LRC Lyrics
       String? savedLyricsPath;
@@ -66,12 +77,12 @@ class DownloadService {
           'https://lrclib.net/api/get?track_name=$cleanTitle&artist_name=$cleanArtist&duration=$durationSeconds',
         );
 
-        final response = await http.get(url, headers: {
+        final lyricRes = await http.get(url, headers: {
           'User-Agent': 'ispotipay-music-player (v1.0.0)',
         }).timeout(const Duration(seconds: 4));
 
-        if (response.statusCode == 200) {
-          final data = json.decode(response.body) as Map<String, dynamic>;
+        if (lyricRes.statusCode == 200) {
+          final data = json.decode(lyricRes.body) as Map<String, dynamic>;
           final syncedLyrics = data['syncedLyrics'] as String? ?? data['plainLyrics'] as String?;
           if (syncedLyrics != null && syncedLyrics.isNotEmpty) {
             final lyricsFile = File(lyricsFilePath);
@@ -79,9 +90,7 @@ class DownloadService {
             savedLyricsPath = lyricsFilePath;
           }
         }
-      } catch (_) {
-        // Continue even if lyrics fetch fails; audio file is already safe
-      }
+      } catch (_) {}
 
       // 3. Update SQLite track entry with local file paths
       final updatedTrack = track.copyWith(
@@ -98,6 +107,6 @@ class DownloadService {
 
   void dispose() {
     _yt.close();
+    _exploreService.dispose();
   }
 }
-

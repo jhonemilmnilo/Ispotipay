@@ -48,8 +48,12 @@ class AudioPlayerService {
         // Play local offline file
         await _player.setFilePath(track.audioPath!);
       } else {
-        // Resolve online stream URL via youtube_explode
-        final streamUrl = await _exploreService.getAudioStreamUrl(track.id);
+        // Resolve online stream URL via exact title & artist
+        final streamUrl = await _exploreService.getAudioStreamUrl(
+          track.id,
+          title: track.title,
+          artist: track.artist,
+        );
         if (streamUrl != null) {
           await _player.setUrl(streamUrl);
         } else {

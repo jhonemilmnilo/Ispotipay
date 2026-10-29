@@ -1,104 +1,156 @@
 import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/track.dart';
 
 class MusicExploreService {
   final YoutubeExplode _yt = YoutubeExplode();
+  final http.Client _httpClient = http.Client();
 
-  /// Curated queries for single tracks and music exploration
-  static const List<String> _seedQueries = [
-    'Top Global Hits Official Audio',
-    'OPM Trending Hits Official Audio',
-    'Billboard Hot 100 Official Music',
-    'Viral Pop Hits Official Audio',
-    'R&B Chill Hits Official Music',
-  ];
+  int _pageOffset = 0;
 
-  int _queryIndex = 0;
-
-  /// Search tracks with duration filter (30 seconds to 10 minutes max)
+  /// Search real studio tracks via iTunes Search API (clean metadata, no video compilations)
   Future<List<Track>> searchTracks(String query, {int limit = 25}) async {
     if (query.trim().isEmpty) return [];
 
     try {
-      final searchResults = await _yt.search.searchContent('$query audio');
-      final List<Track> tracks = [];
+      final encoded = Uri.encodeComponent(query.trim());
+      final url = Uri.parse(
+        'https://itunes.apple.com/search?term=$encoded&entity=song&limit=$limit',
+      );
 
-      for (final item in searchResults) {
-        if (item is SearchVideo) {
-          final durationMs = _parseDuration(item.duration);
-          final durationSec = durationMs / 1000;
+      final response = await _httpClient.get(url).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final results = data['results'] as List;
 
-          // Guardrail: Only accept single tracks (30s to 10 mins)
-          if (durationSec >= 30 && durationSec <= 600) {
-            final thumb = item.thumbnails.isNotEmpty ? item.thumbnails.last.url.toString() : null;
-            tracks.add(
-              Track(
-                id: item.id.value,
-                title: _cleanTitle(item.title),
-                artist: item.author,
-                durationMs: durationMs,
-                thumbnailUrl: thumb,
-              ),
-            );
-          }
-        }
-        if (tracks.length >= limit) break;
+        return results.map((item) {
+          final trackId = item['trackId'].toString();
+          final title = item['trackName'] as String? ?? 'Unknown Title';
+          final artist = item['artistName'] as String? ?? 'Unknown Artist';
+          final album = item['collectionName'] as String?;
+          final durationMs = (item['trackTimeMillis'] as num?)?.toInt() ?? 0;
+          final artworkUrl = (item['artworkUrl100'] as String?)?.replaceAll('100x100bb', '600x600bb');
+
+          return Track(
+            id: trackId,
+            title: title,
+            artist: artist,
+            album: album,
+            durationMs: durationMs,
+            thumbnailUrl: artworkUrl,
+          );
+        }).toList();
       }
-      return tracks;
-    } catch (_) {
-      return [];
-    }
+    } catch (_) {}
+
+    return [];
   }
 
-  /// Get Top / Trending Single Music (30s to 10 mins)
+  /// Get Official Top Hits from iTunes Top Songs Chart (Philippines + Global)
   Future<List<Track>> getTopMusic({int limit = 15}) async {
     try {
-      final searchResults = await _yt.search.searchContent('Billboard Hot 100 Official Audio');
-      final List<Track> tracks = [];
+      final url = Uri.parse('https://itunes.apple.com/ph/rss/topsongs/limit=$limit/json');
+      final response = await _httpClient.get(url).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final feed = data['feed'] as Map<String, dynamic>?;
+        final entries = feed?['entry'] as List?;
+
+        if (entries != null) {
+          return entries.map((e) {
+            final id = e['id']?['attributes']?['im:id']?.toString() ??
+                e['im:name']?['label']?.hashCode.toString() ??
+                '';
+            final title = e['im:name']?['label'] as String? ?? 'Unknown Title';
+            final artist = e['im:artist']?['label'] as String? ?? 'Unknown Artist';
+            final images = e['im:image'] as List?;
+            final artworkUrl = images?.isNotEmpty == true
+                ? images!.last['label'] as String?
+                : null;
+
+            return Track(
+              id: id,
+              title: title,
+              artist: artist,
+              durationMs: 210000,
+              thumbnailUrl: artworkUrl,
+            );
+          }).toList();
+        }
+      }
+    } catch (_) {}
+
+    return [];
+  }
+
+  /// Paginated infinite scroll for "All Music" with 25-item chunks
+  Future<List<Track>> fetchNextAllMusicBatch({int batchSize = 25}) async {
+    final searchTerms = ['pop hits', 'opm hits', 'top trending', 'acoustic hits', 'rnb hits'];
+    final term = searchTerms[(_pageOffset ~/ batchSize) % searchTerms.length];
+    final offset = _pageOffset % 100;
+    _pageOffset += batchSize;
+
+    try {
+      final encoded = Uri.encodeComponent(term);
+      final url = Uri.parse(
+        'https://itunes.apple.com/search?term=$encoded&entity=song&limit=$batchSize&offset=$offset',
+      );
+
+      final response = await _httpClient.get(url).timeout(const Duration(seconds: 5));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final results = data['results'] as List;
+
+        return results.map((item) {
+          final trackId = item['trackId'].toString();
+          final title = item['trackName'] as String? ?? 'Unknown Title';
+          final artist = item['artistName'] as String? ?? 'Unknown Artist';
+          final album = item['collectionName'] as String?;
+          final durationMs = (item['trackTimeMillis'] as num?)?.toInt() ?? 0;
+          final artworkUrl = (item['artworkUrl100'] as String?)?.replaceAll('100x100bb', '600x600bb');
+
+          return Track(
+            id: trackId,
+            title: title,
+            artist: artist,
+            album: album,
+            durationMs: durationMs,
+            thumbnailUrl: artworkUrl,
+          );
+        }).toList();
+      }
+    } catch (_) {}
+
+    return [];
+  }
+
+  /// Resolve exact matching audio stream URL by song title & artist
+  Future<String?> getAudioStreamUrl(String trackId, {String? title, String? artist}) async {
+    try {
+      // 1. If song title is provided, search exact song audio
+      final searchQuery = (title != null && artist != null)
+          ? '$title $artist official audio'
+          : trackId;
+
+      final searchResults = await _yt.search.searchContent(searchQuery);
 
       for (final item in searchResults) {
         if (item is SearchVideo) {
-          final durationMs = _parseDuration(item.duration);
-          final durationSec = durationMs / 1000;
-
+          // Verify duration is a reasonable song (30s to 10 mins)
+          final durationSec = _parseDuration(item.duration) / 1000;
           if (durationSec >= 30 && durationSec <= 600) {
-            final thumb = item.thumbnails.isNotEmpty ? item.thumbnails.last.url.toString() : null;
-            tracks.add(
-              Track(
-                id: item.id.value,
-                title: _cleanTitle(item.title),
-                artist: item.author,
-                durationMs: durationMs,
-                thumbnailUrl: thumb,
-              ),
-            );
+            final manifest = await _yt.videos.streamsClient.getManifest(item.id);
+            final audioStream = manifest.audioOnly.withHighestBitrate();
+            return audioStream.url.toString();
           }
         }
-        if (tracks.length >= limit) break;
       }
-      return tracks;
-    } catch (_) {
-      return [];
-    }
-  }
+    } catch (_) {}
 
-  /// Paginated infinite scroll loader for "All Music"
-  Future<List<Track>> fetchNextAllMusicBatch({int batchSize = 25}) async {
-    final query = _seedQueries[_queryIndex % _seedQueries.length];
-    _queryIndex++;
-    return await searchTracks(query, limit: batchSize);
-  }
-
-  /// Fetch audio stream URL for playback
-  Future<String?> getAudioStreamUrl(String trackId) async {
-    try {
-      final manifest = await _yt.videos.streamsClient.getManifest(trackId);
-      final audioStream = manifest.audioOnly.withHighestBitrate();
-      return audioStream.url.toString();
-    } catch (_) {
-      return null;
-    }
+    return null;
   }
 
   int _parseDuration(String durationStr) {
@@ -113,18 +165,8 @@ class MusicExploreService {
     return 0;
   }
 
-  String _cleanTitle(String title) {
-    return title
-        .replaceAll(RegExp(r'\[Official Audio\]', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\(Official Audio\)', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\[Official Music Video\]', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\(Official Music Video\)', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\[Lyric Video\]', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\(Lyric Video\)', caseSensitive: false), '')
-        .trim();
-  }
-
   void dispose() {
+    _httpClient.close();
     _yt.close();
   }
 }
