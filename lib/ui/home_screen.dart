@@ -6,6 +6,7 @@ import '../services/database_service.dart';
 import '../services/music_explore_service.dart';
 import 'app_theme.dart';
 import 'mini_player_bar.dart';
+import 'player_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -296,7 +297,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: const MiniPlayerBar(),
+      bottomNavigationBar: MiniPlayerBar(
+        onTap: () {
+          final current = AudioPlayerService().currentTrack;
+          if (current != null) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => PlayerScreen(track: current)),
+            );
+          }
+        },
+      ),
     );
   }
 
