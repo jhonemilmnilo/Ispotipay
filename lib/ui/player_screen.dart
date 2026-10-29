@@ -358,7 +358,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                       ),
                                       onTap: () {
                                         Navigator.pop(ctx);
-                                        _audioService.playTrack(track);
+                                        _audioService.playFromQueue(index);
                                       },
                                     );
                                   },

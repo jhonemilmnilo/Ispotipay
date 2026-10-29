@@ -33,12 +33,19 @@ class AudioPlayerService {
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
 
-  // Queue Management (Continuous Radio Loop)
+  // Queue Management (Strict Sequential Queue & Endless Radio)
   final List<Track> _queue = [];
   List<Track> get queue => List.unmodifiable(_queue);
 
   final _queueController = StreamController<List<Track>>.broadcast();
   Stream<List<Track>> get queueStream => _queueController.stream;
+
+  // Session-wide played tracks tracking to ensure NO repetition during listening session
+  final Set<String> _sessionPlayedTrackIds = {};
+  final Set<String> _sessionPlayedTitles = {};
+
+  // Contextual Vibe memory: tracks history in current session to seed future radio chunks
+  final List<Track> _recentVibeSeeds = [];
 
   // Stream URL pre-warmed cache for instant 0-delay playback
   final Map<String, String> _urlCache = {};
@@ -47,7 +54,7 @@ class AudioPlayerService {
   void _initListeners() {
     _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
-        // Continuous Autoplay when song reaches end
+        // Continuous Non-Stop Autoplay
         playNext();
       }
     });
@@ -56,10 +63,14 @@ class AudioPlayerService {
   /// Set the active Up Next queue and prefetch streams in background
   void setQueue(List<Track> newQueue) {
     _queue.clear();
-    _queue.addAll(newQueue);
+    // Exclude anything that has already been played in this session
+    for (final t in newQueue) {
+      if (!_sessionPlayedTrackIds.contains(t.id) &&
+          !_sessionPlayedTitles.contains(t.title.toLowerCase().trim())) {
+        _queue.add(t);
+      }
+    }
     _queueController.add(_queue);
-
-    // Warm up the upcoming tracks stream URLs immediately
     _prefetchUpcomingUrls();
   }
 
@@ -69,7 +80,10 @@ class AudioPlayerService {
     if (_currentTrack != null) existingIds.add(_currentTrack!.id);
 
     for (final track in moreTracks) {
-      if (!existingIds.contains(track.id)) {
+      final cleanTitle = track.title.toLowerCase().trim();
+      if (!existingIds.contains(track.id) &&
+          !_sessionPlayedTrackIds.contains(track.id) &&
+          !_sessionPlayedTitles.contains(cleanTitle)) {
         _queue.add(track);
       }
     }
@@ -77,30 +91,35 @@ class AudioPlayerService {
     _prefetchUpcomingUrls();
   }
 
-  /// Preload stream URLs for the top 3 items in the queue so next songs start instantly
-  void _prefetchUpcomingUrls() {
-    final toWarm = _queue.take(3);
-    for (final track in toWarm) {
-      if (!_urlCache.containsKey(track.id) && !track.isDownloaded) {
-        _exploreService
-            .getAudioStreamUrl(
-              track.id,
-              title: track.title,
-              artist: track.artist,
-              targetDurationMs: track.durationMs,
-            )
-            .then((url) {
-              if (url != null) {
-                _urlCache[track.id] = url;
-              }
-            })
-            .catchError((_) {});
-      }
-    }
+  /// User taps a specific track in the Up Next list:
+  /// Play that track and slice the queue so all songs below it become the upcoming queue in order!
+  Future<void> playFromQueue(int index) async {
+    if (index < 0 || index >= _queue.length) return;
+
+    final selectedTrack = _queue[index];
+
+    // The upcoming queue becomes strictly everything after the selected item
+    final remainingQueue = _queue.sublist(index + 1);
+    _queue.clear();
+    _queue.addAll(remainingQueue);
+    _queueController.add(_queue);
+
+    await _executePlay(selectedTrack);
   }
 
-  /// Play a track (from local file or remote stream)
+  /// Play a track directly
   Future<void> playTrack(Track track, {List<Track>? initialQueue}) async {
+    if (initialQueue != null) {
+      setQueue(initialQueue);
+    } else {
+      _queue.removeWhere((t) => t.id == track.id);
+      _queueController.add(_queue);
+    }
+
+    await _executePlay(track);
+  }
+
+  Future<void> _executePlay(Track track) async {
     await _player.pause();
     _isPreloading = true;
     _isPreloadingController.add(true);
@@ -108,12 +127,14 @@ class AudioPlayerService {
     _currentTrack = track;
     _currentTrackController.add(_currentTrack);
 
-    // Remove from upcoming queue if it's currently in queue
-    _queue.removeWhere((t) => t.id == track.id);
-    if (initialQueue != null) {
-      setQueue(initialQueue);
-    } else {
-      _queueController.add(_queue);
+    // Record in session played history
+    _sessionPlayedTrackIds.add(track.id);
+    _sessionPlayedTitles.add(track.title.toLowerCase().trim());
+
+    // Record in Vibe memory (keep last 5 tracks as radio context)
+    _recentVibeSeeds.add(track);
+    if (_recentVibeSeeds.length > 5) {
+      _recentVibeSeeds.removeAt(0);
     }
 
     // Record in local SQLite
@@ -123,7 +144,7 @@ class AudioPlayerService {
       if (track.isDownloaded && track.audioPath != null) {
         await _player.setFilePath(track.audioPath!);
       } else {
-        // Check cache first for instant zero-delay playback
+        // Check pre-warmed cache first for instant zero-delay playback
         String? streamUrl = _urlCache[track.id];
         streamUrl ??= await _exploreService.getAudioStreamUrl(
           track.id,
@@ -163,25 +184,52 @@ class AudioPlayerService {
     if (_queue.isNotEmpty) {
       final nextTrack = _queue.removeAt(0);
       _queueController.add(_queue);
-      await playTrack(nextTrack);
+      await _executePlay(nextTrack);
     } else if (_currentTrack != null) {
       // Emergency queue replenishment if empty
       await _autoReplenishQueue();
       if (_queue.isNotEmpty) {
         final nextTrack = _queue.removeAt(0);
         _queueController.add(_queue);
-        await playTrack(nextTrack);
+        await _executePlay(nextTrack);
       }
     }
   }
 
-  /// Automatically fetch new tracks based on currently playing artist/vibe
+  /// Preload stream URLs for the top 3 items in the queue so next songs start instantly
+  void _prefetchUpcomingUrls() {
+    final toWarm = _queue.take(3);
+    for (final track in toWarm) {
+      if (!_urlCache.containsKey(track.id) && !track.isDownloaded) {
+        _exploreService
+            .getAudioStreamUrl(
+              track.id,
+              title: track.title,
+              artist: track.artist,
+              targetDurationMs: track.durationMs,
+            )
+            .then((url) {
+              if (url != null) {
+                _urlCache[track.id] = url;
+              }
+            })
+            .catchError((_) {});
+      }
+    }
+  }
+
+  /// Automatically fetch new tracks based on currently playing and previous vibe context
   Future<void> _autoReplenishQueue() async {
     if (_isAutoReplenishing || _currentTrack == null) return;
     _isAutoReplenishing = true;
 
     try {
-      final more = await _exploreService.getUpNextQueue(_currentTrack!, limit: 20);
+      // Use recent vibe context (up to 3 recent tracks) to anchor the next radio wave
+      final anchorTrack = _recentVibeSeeds.isNotEmpty
+          ? _recentVibeSeeds[_recentVibeSeeds.length ~/ 2]
+          : _currentTrack!;
+
+      final more = await _exploreService.getUpNextQueue(anchorTrack, limit: 25);
       appendToQueue(more);
     } catch (_) {}
 
