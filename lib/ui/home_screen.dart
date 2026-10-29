@@ -163,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           text: const TextSpan(
                             children: [
                               TextSpan(
-                                text: 'ispoti',
+                                text: 'IsPo',
                                 style: TextStyle(
                                   color: AppTheme.textPrimary,
                                   fontSize: 26,
@@ -171,7 +171,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                               TextSpan(
-                                text: 'pay',
+                                text: 'TiPay',
                                 style: TextStyle(
                                   color: AppTheme.accentLime,
                                   fontSize: 26,
