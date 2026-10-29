@@ -602,9 +602,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           ? Image.network(
                               track.thumbnailUrl!,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => _buildFallbackThumbnail(),
+                              frameBuilder: (context, child, frame, wasSync) {
+                                if (wasSync || frame != null) return child;
+                                return _buildFallbackThumbnail(
+                                  title: track.title,
+                                  artist: track.artist,
+                                );
+                              },
+                              errorBuilder: (_, _, _) => _buildFallbackThumbnail(
+                                title: track.title,
+                                artist: track.artist,
+                              ),
                             )
-                          : _buildFallbackThumbnail(),
+                          : _buildFallbackThumbnail(
+                              title: track.title,
+                              artist: track.artist,
+                            ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -722,9 +735,22 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           ? Image.network(
                               track.thumbnailUrl!,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => _buildFallbackThumbnail(),
+                              frameBuilder: (context, child, frame, wasSync) {
+                                if (wasSync || frame != null) return child;
+                                return _buildFallbackThumbnail(
+                                  title: track.title,
+                                  artist: track.artist,
+                                );
+                              },
+                              errorBuilder: (_, _, _) => _buildFallbackThumbnail(
+                                title: track.title,
+                                artist: track.artist,
+                              ),
                             )
-                          : _buildFallbackThumbnail(),
+                          : _buildFallbackThumbnail(
+                              title: track.title,
+                              artist: track.artist,
+                            ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -869,9 +895,25 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 width: 48,
                 height: 48,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => _buildFallbackThumbnail(size: 48),
+                frameBuilder: (context, child, frame, wasSync) {
+                  if (wasSync || frame != null) return child;
+                  return _buildFallbackThumbnail(
+                    title: track.title,
+                    artist: track.artist,
+                    size: 48,
+                  );
+                },
+                errorBuilder: (_, _, _) => _buildFallbackThumbnail(
+                  title: track.title,
+                  artist: track.artist,
+                  size: 48,
+                ),
               )
-            : _buildFallbackThumbnail(size: 48),
+            : _buildFallbackThumbnail(
+                title: track.title,
+                artist: track.artist,
+                size: 48,
+              ),
       ),
       title: Text(
         track.title,
@@ -953,12 +995,65 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildFallbackThumbnail({double size = double.infinity}) {
+  Widget _buildFallbackThumbnail({
+    String? title,
+    String? artist,
+    double size = double.infinity,
+  }) {
+    final int charCode = (title != null && title.isNotEmpty) ? title.codeUnitAt(0) : 65;
+    final List<Color> gradientColors = [
+      const Color(0xFF1558C9),
+      Color.lerp(const Color(0xFF030407), const Color(0xFF1558C9), (charCode % 5) / 10)!,
+      const Color(0xFF0A0F1D),
+    ];
+
     return Container(
       width: size,
       height: size,
-      color: AppTheme.surfaceLight,
-      child: const Icon(Icons.music_note, color: AppTheme.textSecondary),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradientColors,
+        ),
+        borderRadius: BorderRadius.circular(size == double.infinity ? 10 : (size * 0.16)),
+        border: Border.all(
+          color: AppTheme.accentLime.withValues(alpha: 0.25),
+          width: 0.8,
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: size == double.infinity ? 80 : (size * 0.75),
+            height: size == double.infinity ? 80 : (size * 0.75),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 0.8,
+              ),
+            ),
+          ),
+          Container(
+            width: size == double.infinity ? 50 : (size * 0.5),
+            height: size == double.infinity ? 50 : (size * 0.5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12),
+                width: 0.8,
+              ),
+            ),
+          ),
+          Icon(
+            Icons.music_note_rounded,
+            color: AppTheme.accentLime,
+            size: size == double.infinity ? 36 : (size * 0.45),
+          ),
+        ],
+      ),
     );
   }
 

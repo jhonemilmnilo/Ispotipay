@@ -227,6 +227,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                     width: 38,
                                     height: 38,
                                     fit: BoxFit.cover,
+                                    frameBuilder: (context, child, frame, wasSync) {
+                                      if (wasSync || frame != null) return child;
+                                      return _buildCustomThumbnail(
+                                        title: _activeTrack!.title,
+                                        artist: _activeTrack!.artist,
+                                        size: 38,
+                                      );
+                                    },
                                     errorBuilder: (_, _, _) => _buildCustomThumbnail(
                                       title: _activeTrack!.title,
                                       artist: _activeTrack!.artist,
@@ -320,6 +328,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                                 width: 46,
                                                 height: 46,
                                                 fit: BoxFit.cover,
+                                                frameBuilder: (context, child, frame, wasSync) {
+                                                  if (wasSync || frame != null) return child;
+                                                  return _buildCustomThumbnail(
+                                                    title: track.title,
+                                                    artist: track.artist,
+                                                    size: 46,
+                                                  );
+                                                },
                                                 errorBuilder: (_, _, _) => _buildCustomThumbnail(
                                                   title: track.title,
                                                   artist: track.artist,
