@@ -44,6 +44,9 @@ class AudioPlayerService {
   final Set<String> _sessionPlayedTrackIds = {};
   final Set<String> _sessionPlayedTitles = {};
 
+  // Stack of previously played tracks for the Previous button
+  final List<Track> _playbackHistory = [];
+
   // Contextual Vibe memory: tracks history in current session to seed future radio chunks
   final List<Track> _recentVibeSeeds = [];
 
@@ -116,10 +119,14 @@ class AudioPlayerService {
       _queueController.add(_queue);
     }
 
-    await _executePlay(track);
+    await _executePlay(track, addToHistory: true);
   }
 
-  Future<void> _executePlay(Track track) async {
+  Future<void> _executePlay(Track track, {bool addToHistory = true}) async {
+    if (addToHistory && _currentTrack != null && _currentTrack!.id != track.id) {
+      _playbackHistory.add(_currentTrack!);
+    }
+
     await _player.pause();
     _isPreloading = true;
     _isPreloadingController.add(true);
@@ -179,20 +186,44 @@ class AudioPlayerService {
     }
   }
 
-  /// Play the next song in the queue (Continuous Autoplay)
+  /// Play the next song in the queue (Strictly the next item in Up Next)
   Future<void> playNext() async {
     if (_queue.isNotEmpty) {
       final nextTrack = _queue.removeAt(0);
       _queueController.add(_queue);
-      await _executePlay(nextTrack);
+      await _executePlay(nextTrack, addToHistory: true);
     } else if (_currentTrack != null) {
       // Emergency queue replenishment if empty
       await _autoReplenishQueue();
       if (_queue.isNotEmpty) {
         final nextTrack = _queue.removeAt(0);
         _queueController.add(_queue);
-        await _executePlay(nextTrack);
+        await _executePlay(nextTrack, addToHistory: true);
       }
+    }
+  }
+
+  /// Play the previous song or rewind to 00:00
+  Future<void> playPrevious() async {
+    // If song has played for more than 3 seconds, standard music player behavior is to restart it
+    if (_player.position.inSeconds > 3) {
+      await seek(Duration.zero);
+      return;
+    }
+
+    if (_playbackHistory.isNotEmpty) {
+      final prevTrack = _playbackHistory.removeLast();
+
+      // Put current track back to front of upcoming queue so user doesn't lose their place
+      if (_currentTrack != null) {
+        _queue.insert(0, _currentTrack!);
+        _queueController.add(_queue);
+      }
+
+      await _executePlay(prevTrack, addToHistory: false);
+    } else {
+      // Fallback: just restart current track
+      await seek(Duration.zero);
     }
   }
 

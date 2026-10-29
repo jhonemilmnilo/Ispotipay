@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 import '../models/lyric_line.dart';
 import '../models/track.dart';
 import '../services/audio_player_service.dart';
+import '../services/database_service.dart';
 import '../services/lyrics_service.dart';
 import '../services/music_explore_service.dart';
 import 'app_theme.dart';
@@ -21,11 +22,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   final AudioPlayerService _audioService = AudioPlayerService();
   final LyricsService _lyricsService = LyricsService();
   final MusicExploreService _exploreService = MusicExploreService();
+  final DatabaseService _dbService = DatabaseService();
   late AnimationController _shimmerController;
 
   Track? _activeTrack;
   List<LyricLine> _lyrics = [];
   bool _isLoadingLyrics = true;
+  bool _isFavorite = false;
 
   List<Track> _upNextTracks = [];
   bool _isLoadingUpNext = false;
@@ -42,6 +45,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       ..repeat(min: 0.0, max: 1.0, period: const Duration(milliseconds: 1200));
 
     _loadLyrics(_activeTrack!);
+    _checkFavoriteStatus(_activeTrack!);
 
     // If AudioPlayerService already has a populated queue, use it; otherwise generate fresh
     if (_audioService.queue.isNotEmpty) {
@@ -60,6 +64,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             _isLoadingLyrics = true;
           });
           _loadLyrics(newTrack);
+          _checkFavoriteStatus(newTrack);
         }
       }
     });
@@ -81,6 +86,15 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     _shimmerController.dispose();
     _exploreService.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkFavoriteStatus(Track track) async {
+    final fav = await _dbService.isFavorite(track.id);
+    if (mounted) {
+      setState(() {
+        _isFavorite = fav;
+      });
+    }
   }
 
   Future<void> _loadUpNext(Track track) async {
@@ -652,7 +666,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Left Side: YouTube Music Style Up Next Queue Button
+                          // Left: YouTube Music Style Up Next Queue Button
                           IconButton(
                             icon: const Icon(
                               Icons.queue_music,
@@ -663,38 +677,94 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             onPressed: () => _showUpNextDrawer(context),
                           ),
 
-                          // Center: Play / Pause Control
-                          StreamBuilder<PlayerState>(
-                            stream: _audioService.playerStateStream,
-                            builder: (context, snapshot) {
-                              final isPlaying = snapshot.data?.playing ?? false;
-                              final processing = snapshot.data?.processingState;
+                          // Center Cluster: Previous, Play/Pause, Next
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Previous Song Button
+                              IconButton(
+                                iconSize: 38,
+                                icon: const Icon(
+                                  Icons.skip_previous_rounded,
+                                  color: AppTheme.textPrimary,
+                                ),
+                                tooltip: 'Previous',
+                                onPressed: () => _audioService.playPrevious(),
+                              ),
+                              const SizedBox(width: 8),
 
-                              if (processing == ProcessingState.buffering ||
-                                  processing == ProcessingState.loading) {
-                                return const SizedBox(
-                                  width: 56,
-                                  height: 56,
-                                  child: Padding(
-                                    padding: EdgeInsets.all(12.0),
-                                    child: CircularProgressIndicator(color: AppTheme.accentLime),
+                              // Main Play / Pause Button
+                              StreamBuilder<PlayerState>(
+                                stream: _audioService.playerStateStream,
+                                builder: (context, snapshot) {
+                                  final isPlaying = snapshot.data?.playing ?? false;
+                                  final processing = snapshot.data?.processingState;
+
+                                  if (processing == ProcessingState.buffering ||
+                                      processing == ProcessingState.loading) {
+                                    return const SizedBox(
+                                      width: 60,
+                                      height: 60,
+                                      child: Padding(
+                                        padding: EdgeInsets.all(14.0),
+                                        child: CircularProgressIndicator(color: AppTheme.accentLime),
+                                      ),
+                                    );
+                                  }
+
+                                  return IconButton(
+                                    iconSize: 60,
+                                    icon: Icon(
+                                      isPlaying
+                                          ? Icons.pause_circle_filled
+                                          : Icons.play_circle_filled,
+                                      color: AppTheme.accentLime,
+                                    ),
+                                    onPressed: () => _audioService.togglePlayPause(),
+                                  );
+                                },
+                              ),
+                              const SizedBox(width: 8),
+
+                              // Next Song Button (Strictly plays next track in Up Next queue)
+                              IconButton(
+                                iconSize: 38,
+                                icon: const Icon(
+                                  Icons.skip_next_rounded,
+                                  color: AppTheme.textPrimary,
+                                ),
+                                tooltip: 'Next',
+                                onPressed: () => _audioService.playNext(),
+                              ),
+                            ],
+                          ),
+
+                          // Right: Favorite Heart Toggle
+                          IconButton(
+                            icon: Icon(
+                              _isFavorite ? Icons.favorite : Icons.favorite_border,
+                              color: _isFavorite ? Colors.redAccent : AppTheme.textPrimary,
+                              size: 24,
+                            ),
+                            tooltip: 'Favorite',
+                            onPressed: () async {
+                              if (_activeTrack != null) {
+                                final isFav = await _dbService.toggleFavorite(_activeTrack!);
+                                if (!context.mounted) return;
+                                setState(() {
+                                  _isFavorite = isFav;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(isFav
+                                        ? 'Added to Favorites'
+                                        : 'Removed from Favorites'),
+                                    duration: const Duration(seconds: 1),
                                   ),
                                 );
                               }
-
-                              return IconButton(
-                                iconSize: 56,
-                                icon: Icon(
-                                  isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                                  color: AppTheme.accentLime,
-                                ),
-                                onPressed: () => _audioService.togglePlayPause(),
-                              );
                             },
                           ),
-
-                          // Right Side spacer or balance placeholder
-                          const SizedBox(width: 48),
                         ],
                       ),
                     ],
