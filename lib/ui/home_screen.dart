@@ -30,6 +30,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Timer? _debounceTimer;
 
   final List<Track> _topMusic = [];
+  final List<Track> _recommended = [];
   final List<Playlist> _topPlaylists = [];
   List<Track> _recents = [];
   List<Track> _favorites = [];
@@ -38,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   bool _isLoadingTop = true;
   bool _isLoadingMoreTop = false;
+  bool _isLoadingRecommended = true;
   bool _isLoadingPlaylists = true;
   bool _isLoadingMorePlaylists = false;
   bool _isLoadingAll = true;
@@ -192,6 +194,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Future<void> _fetchOnlineMusic() async {
     _topMusicOffset = 0;
     final top = await _exploreService.getTopMusic(offset: 0, limit: 15);
+    final recommended = await _exploreService.getRecommendedTracks(limit: 20);
     final all = await _exploreService.fetchNextAllMusicBatch(batchSize: 25);
     final playlists = _exploreService.getTopPlaylists(offset: 0, limit: 15);
 
@@ -200,6 +203,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _topMusic.clear();
         _topMusic.addAll(top);
         _topMusicOffset = top.length;
+
+        _recommended.clear();
+        _recommended.addAll(recommended);
+        _isLoadingRecommended = false;
 
         _topPlaylists.clear();
         _topPlaylists.addAll(playlists);
@@ -319,6 +326,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               SliverToBoxAdapter(
                 child: _buildTopMusicCarousel(),
               ),
+
+              // Recommended For You Section (Spotify / YT Music Taste-based, max 20)
+              if (_recommended.isNotEmpty || _isLoadingRecommended) ...[
+                SliverToBoxAdapter(
+                  child: _buildSectionHeader(
+                    'Recommended For You',
+                    icon: Icons.auto_awesome,
+                    iconColor: AppTheme.accentLime,
+                    badge: '${_recommended.length}/20',
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: _buildHorizontalCarousel(
+                    tracks: _recommended,
+                    isLoading: _isLoadingRecommended,
+                    cardWidth: 145,
+                    cardHeight: 195,
+                  ),
+                ),
+              ],
 
               // 3. Recent Played Section (Horizontal Carousel, Max 15)
               if (_recents.isNotEmpty) ...[

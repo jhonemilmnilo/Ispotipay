@@ -400,15 +400,35 @@ class MusicExploreService {
     return [];
   }
 
-  /// Algorithm-based recommended infinite scroll for "All Music" with 25-item chunks
+  /// Algorithm-based recommended infinite scroll for "All Music" with diverse interleaved artists
   Future<List<Track>> fetchNextAllMusicBatch({int batchSize = 25}) async {
     final chunkIndex = _pageOffset ~/ batchSize;
     _pageOffset += batchSize;
 
-    // Use AI/taste recommendation engine based on user favorites and play history
-    final query = await _recEngine.getRecommendedQuery(chunkIndex);
+    // Fetch across 4 distinct queries in parallel to ensure diverse artists
+    final seedQueries = await _recEngine.getMultiSeedQueries(
+      count: 4,
+      offsetIndex: chunkIndex * 3,
+    );
 
-    return await searchTracks(query, limit: batchSize);
+    final futureResults = seedQueries.map((q) => searchTracks(q, limit: 10));
+    final fetchedLists = await Future.wait(futureResults);
+
+    // Interleave so no contiguous tracks come from the same artist
+    return _recEngine.interleaveDiverseArtists(fetchedLists, limit: batchSize);
+  }
+
+  /// Get Personalized "Recommended for You" tracks (capped at 20, refreshed based on listens)
+  Future<List<Track>> getRecommendedTracks({int limit = 20}) async {
+    final seedQueries = await _recEngine.getMultiSeedQueries(
+      count: 5,
+      offsetIndex: DateTime.now().minute,
+    );
+
+    final futureResults = seedQueries.map((q) => searchTracks(q, limit: 8));
+    final fetchedLists = await Future.wait(futureResults);
+
+    return _recEngine.interleaveDiverseArtists(fetchedLists, limit: limit);
   }
 
   /// Resolve exact matching playable stream URL with strict 0-delay duration delta ranking
