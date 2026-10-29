@@ -118,11 +118,19 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
+      enableDrag: true,
+      useSafeArea: true,
+      sheetAnimationStyle: AnimationStyle(
+        duration: const Duration(milliseconds: 320),
+        reverseDuration: const Duration(milliseconds: 260),
+      ),
       builder: (ctx) {
         return DraggableScrollableSheet(
           initialChildSize: 0.65,
           minChildSize: 0.35,
-          maxChildSize: 0.92,
+          maxChildSize: 0.94,
+          snap: true,
+          snapSizes: const [0.35, 0.65, 0.94],
           builder: (sheetContext, scrollController) {
             return Container(
               decoration: const BoxDecoration(
@@ -130,9 +138,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black54,
-                    blurRadius: 20,
-                    offset: Offset(0, -5),
+                    color: Colors.black87,
+                    blurRadius: 25,
+                    offset: Offset(0, -6),
                   ),
                 ],
               ),
@@ -142,11 +150,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   const SizedBox(height: 12),
                   Center(
                     child: Container(
-                      width: 42,
-                      height: 4,
+                      width: 44,
+                      height: 4.5,
                       decoration: BoxDecoration(
-                        color: AppTheme.textSecondary.withValues(alpha: 0.4),
-                        borderRadius: BorderRadius.circular(2),
+                        color: AppTheme.textSecondary.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(3),
                       ),
                     ),
                   ),
@@ -268,9 +276,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   // Up Next Queue List
                   Expanded(
                     child: _isLoadingUpNext
-                        ? const Center(
-                            child: CircularProgressIndicator(color: AppTheme.accentLime),
-                          )
+                        ? _buildUpNextShimmerList()
                         : _upNextTracks.isEmpty
                             ? const Center(
                                 child: Text(
@@ -288,22 +294,13 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 },
                                 child: ListView.builder(
                                   controller: scrollController,
-                                  itemCount: _upNextTracks.length + (_isLoadingMoreUpNext ? 1 : 0),
+                                  physics: const BouncingScrollPhysics(
+                                    parent: AlwaysScrollableScrollPhysics(),
+                                  ),
+                                  itemCount: _upNextTracks.length + (_isLoadingMoreUpNext ? 2 : 0),
                                   itemBuilder: (context, index) {
-                                    if (index == _upNextTracks.length) {
-                                      return const Padding(
-                                        padding: EdgeInsets.symmetric(vertical: 16),
-                                        child: Center(
-                                          child: SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              color: AppTheme.accentLime,
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
-                                        ),
-                                      );
+                                    if (index >= _upNextTracks.length) {
+                                      return _buildShimmerQueueTile();
                                     }
                                     final track = _upNextTracks[index];
                                     return ListTile(
@@ -724,6 +721,63 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 decoration: BoxDecoration(
                   color: AppTheme.textSecondary.withValues(alpha: opacity * 0.5),
                   borderRadius: BorderRadius.circular(6),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildUpNextShimmerList() {
+    return ListView.builder(
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 6,
+      itemBuilder: (_, _) => _buildShimmerQueueTile(),
+    );
+  }
+
+  Widget _buildShimmerQueueTile() {
+    return AnimatedBuilder(
+      animation: _shimmerController,
+      builder: (context, child) {
+        final opacity = 0.12 + (0.18 * (0.5 - (_shimmerController.value - 0.5).abs()));
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceLight.withValues(alpha: opacity),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLight.withValues(alpha: opacity),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 130,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLight.withValues(alpha: opacity * 0.7),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
