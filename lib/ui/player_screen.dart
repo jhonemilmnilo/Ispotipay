@@ -84,49 +84,33 @@ class _PlayerScreenState extends State<PlayerScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Section: Track Info & Artwork
+            // Top Section: Track Info (Centered, No Thumbnail)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Row(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: Column(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: widget.track.thumbnailUrl != null
-                        ? Image.network(
-                            widget.track.thumbnailUrl!,
-                            width: 64,
-                            height: 64,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => _fallbackArt(),
-                          )
-                        : _fallbackArt(),
+                  Text(
+                    widget.track.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      letterSpacing: -0.3,
+                    ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.track.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppTheme.textPrimary,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          widget.track.artist,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppTheme.textSecondary,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 6),
+                  Text(
+                    widget.track.artist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -179,24 +163,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
                                   return Stack(
                                     children: [
-                                      // Soft center slot indicator line/glow
-                                      Positioned(
-                                        top: halfHeight - (slotHeight / 2),
-                                        left: 40,
-                                        right: 40,
-                                        height: slotHeight,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.primary.withValues(alpha: 0.08),
-                                            borderRadius: BorderRadius.circular(16),
-                                            border: Border.all(
-                                              color: AppTheme.accentLime.withValues(alpha: 0.15),
-                                              width: 1,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-
                                       // The sliding lyrics canvas
                                       AnimatedPositioned(
                                         duration: const Duration(milliseconds: 350),
@@ -359,15 +325,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _fallbackArt() {
-    return Container(
-      width: 64,
-      height: 64,
-      color: AppTheme.surfaceLight,
-      child: const Icon(Icons.music_note, color: AppTheme.textSecondary),
     );
   }
 }
