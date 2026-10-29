@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/track.dart';
+import '../services/audio_player_service.dart';
 import '../services/database_service.dart';
 import '../services/music_explore_service.dart';
 import 'app_theme.dart';
+import 'mini_player_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -99,20 +101,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _playTrack(Track track) async {
-    await _dbService.recordPlay(track);
+    await AudioPlayerService().playTrack(track);
     _loadAllSections();
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppTheme.surfaceLight,
-          content: Text(
-            'Playing: ${track.title}',
-            style: const TextStyle(color: AppTheme.accentLime),
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
   }
 
   @override
@@ -302,10 +292,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
             ],
-            const SliverToBoxAdapter(child: SizedBox(height: 80)),
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
       ),
+      bottomNavigationBar: const MiniPlayerBar(),
     );
   }
 
