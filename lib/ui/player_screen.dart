@@ -22,7 +22,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   List<LyricLine> _lyrics = [];
   bool _isLoadingLyrics = true;
-  int _activeLineIndex = 0;
 
   @override
   void initState() {
@@ -57,22 +56,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
       }
     }
     return index;
-  }
-
-  void _scrollToActiveLine(int index, double viewportHeight) {
-    if (index != _activeLineIndex) {
-      _activeLineIndex = index;
-      if (_lyricsScrollController.hasClients) {
-        // Precise vertical centering: item height is 52px (32px font + 20px padding)
-        const itemHeight = 52.0;
-        final targetOffset = (index * itemHeight) - (viewportHeight / 2) + (itemHeight / 2);
-        _lyricsScrollController.animateTo(
-          targetOffset.clamp(0.0, _lyricsScrollController.position.maxScrollExtent),
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOutCubic,
-        );
-      }
-    }
   }
 
   String _formatDuration(Duration d) {
@@ -152,7 +135,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
             const Divider(color: AppTheme.divider, height: 24),
 
-            // Middle Section: Synchronized Karaoke Scrolling Lyrics
+            // Middle Section: Strict Center-Locked Sliding Teleprompter Lyrics
             Expanded(
               child: _isLoadingLyrics
                   ? const Center(
@@ -168,64 +151,105 @@ class _PlayerScreenState extends State<PlayerScreen> {
                       : LayoutBuilder(
                           builder: (context, constraints) {
                             final halfHeight = constraints.maxHeight / 2;
+                            const slotHeight = 64.0;
 
-                            return StreamBuilder<Duration>(
-                              stream: _audioService.positionStream,
-                              builder: (context, snapshot) {
-                                final currentPosition = snapshot.data ?? Duration.zero;
-                                final activeIndex = _findActiveLineIndex(currentPosition);
+                            return ShaderMask(
+                              shaderCallback: (Rect bounds) {
+                                return const LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black,
+                                    Colors.black,
+                                    Colors.transparent,
+                                  ],
+                                  stops: [0.0, 0.35, 0.65, 1.0],
+                                ).createShader(bounds);
+                              },
+                              blendMode: BlendMode.dstIn,
+                              child: StreamBuilder<Duration>(
+                                stream: _audioService.positionStream,
+                                builder: (context, snapshot) {
+                                  final currentPosition = snapshot.data ?? Duration.zero;
+                                  final activeIndex = _findActiveLineIndex(currentPosition);
 
-                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                  if (mounted) {
-                                    _scrollToActiveLine(activeIndex, constraints.maxHeight);
-                                  }
-                                });
+                                  // Exactly anchor the sliding container so activeIndex is strictly centered
+                                  final targetOffset = (activeIndex * slotHeight);
 
-                                return ListView.builder(
-                                  controller: _lyricsScrollController,
-                                  padding: EdgeInsets.only(
-                                    top: halfHeight - 26.0,
-                                    bottom: halfHeight - 26.0,
-                                    left: 24,
-                                    right: 24,
-                                  ),
-                                  itemCount: _lyrics.length,
-                                  itemBuilder: (context, index) {
-                                    final line = _lyrics[index];
-                                    final isCurrent = index == activeIndex;
-
-                                    return Container(
-                                      height: 52.0,
-                                      alignment: Alignment.center,
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          if (line.timestamp > Duration.zero) {
-                                            _audioService.seek(line.timestamp);
-                                          }
-                                        },
-                                        child: AnimatedDefaultTextStyle(
-                                          duration: const Duration(milliseconds: 250),
-                                          curve: Curves.easeOut,
-                                          style: TextStyle(
-                                            color: isCurrent
-                                                ? AppTheme.accentLime
-                                                : AppTheme.textSecondary.withValues(alpha: 0.35),
-                                            fontSize: isCurrent ? 24 : 17,
-                                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                                            letterSpacing: -0.2,
-                                          ),
-                                          child: Text(
-                                            line.text.isEmpty ? '♪' : line.text,
-                                            textAlign: TextAlign.center,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
+                                  return Stack(
+                                    children: [
+                                      // Soft center slot indicator line/glow
+                                      Positioned(
+                                        top: halfHeight - (slotHeight / 2),
+                                        left: 40,
+                                        right: 40,
+                                        height: slotHeight,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: AppTheme.primary.withValues(alpha: 0.08),
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(
+                                              color: AppTheme.accentLime.withValues(alpha: 0.15),
+                                              width: 1,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    );
-                                  },
-                                );
-                              },
+
+                                      // The sliding lyrics canvas
+                                      AnimatedPositioned(
+                                        duration: const Duration(milliseconds: 350),
+                                        curve: Curves.easeOutCubic,
+                                        top: halfHeight - (slotHeight / 2) - targetOffset,
+                                        left: 0,
+                                        right: 0,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: List.generate(_lyrics.length, (index) {
+                                            final line = _lyrics[index];
+                                            final isCurrent = index == activeIndex;
+
+                                            return SizedBox(
+                                              height: slotHeight,
+                                              child: Center(
+                                                child: GestureDetector(
+                                                  onTap: () {
+                                                    if (line.timestamp > Duration.zero) {
+                                                      _audioService.seek(line.timestamp);
+                                                    }
+                                                  },
+                                                  child: Padding(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                                                    child: AnimatedDefaultTextStyle(
+                                                      duration: const Duration(milliseconds: 250),
+                                                      curve: Curves.easeOut,
+                                                      textAlign: TextAlign.center,
+                                                      style: TextStyle(
+                                                        color: isCurrent
+                                                            ? AppTheme.accentLime
+                                                            : AppTheme.textSecondary.withValues(alpha: 0.25),
+                                                        fontSize: isCurrent ? 22 : 16,
+                                                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                                                        letterSpacing: -0.3,
+                                                      ),
+                                                      child: Text(
+                                                        line.text.isEmpty ? '♪' : line.text,
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            );
+                                          }),
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
                             );
                           },
                         ),
