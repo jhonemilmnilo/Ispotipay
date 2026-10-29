@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import '../models/track.dart';
 import 'database_service.dart';
@@ -48,27 +49,30 @@ class AudioPlayerService {
         // Play local offline file
         await _player.setFilePath(track.audioPath!);
       } else {
-        // Resolve online stream URL via exact title & artist
+        // 1. Resolve online stream URL via exact title & artist
         final streamUrl = await _exploreService.getAudioStreamUrl(
           track.id,
           title: track.title,
           artist: track.artist,
         );
         if (streamUrl != null) {
-          // Provide mobile Android user-agent header to bypass 403 blocks
-          await _player.setUrl(
-            streamUrl,
-            headers: {
-              'User-Agent': 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
-            },
+          // just_audio stream loading
+          await _player.setAudioSource(
+            AudioSource.uri(
+              Uri.parse(streamUrl),
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              },
+            ),
           );
         } else {
           throw Exception('Could not resolve audio stream URL');
         }
       }
       await _player.play();
-    } catch (_) {
-      // Gracefully handle playback failures
+    } catch (e) {
+      // Print error so user/logs can see exact playback problem
+      debugPrint('[AudioPlayerService] Playback error: $e');
     }
   }
 
