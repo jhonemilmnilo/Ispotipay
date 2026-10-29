@@ -59,13 +59,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
     return index;
   }
 
-  void _scrollToActiveLine(int index) {
+  void _scrollToActiveLine(int index, double viewportHeight) {
     if (index != _activeLineIndex) {
       _activeLineIndex = index;
       if (_lyricsScrollController.hasClients) {
-        // Calculate offset so the active line sits dead-center in the viewport
-        final viewportHeight = _lyricsScrollController.position.viewportDimension;
-        final targetOffset = (index * 56.0) - (viewportHeight / 2) + 28.0;
+        // Precise vertical centering: item height is 52px (32px font + 20px padding)
+        const itemHeight = 52.0;
+        final targetOffset = (index * itemHeight) - (viewportHeight / 2) + (itemHeight / 2);
         _lyricsScrollController.animateTo(
           targetOffset.clamp(0.0, _lyricsScrollController.position.maxScrollExtent),
           duration: const Duration(milliseconds: 350),
@@ -165,56 +165,65 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             style: TextStyle(color: AppTheme.textSecondary),
                           ),
                         )
-                      : StreamBuilder<Duration>(
-                          stream: _audioService.positionStream,
-                          builder: (context, snapshot) {
-                            final currentPosition = snapshot.data ?? Duration.zero;
-                            final activeIndex = _findActiveLineIndex(currentPosition);
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            final halfHeight = constraints.maxHeight / 2;
 
-                            // Schedule smooth scroll without mutating state during build
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (mounted) {
-                                _scrollToActiveLine(activeIndex);
-                              }
-                            });
+                            return StreamBuilder<Duration>(
+                              stream: _audioService.positionStream,
+                              builder: (context, snapshot) {
+                                final currentPosition = snapshot.data ?? Duration.zero;
+                                final activeIndex = _findActiveLineIndex(currentPosition);
 
-                            return ListView.builder(
-                              controller: _lyricsScrollController,
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 24,
-                                vertical: MediaQuery.of(context).size.height * 0.25,
-                              ),
-                              itemCount: _lyrics.length,
-                              itemBuilder: (context, index) {
-                                final line = _lyrics[index];
-                                final isCurrent = index == activeIndex;
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (mounted) {
+                                    _scrollToActiveLine(activeIndex, constraints.maxHeight);
+                                  }
+                                });
 
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      if (line.timestamp > Duration.zero) {
-                                        _audioService.seek(line.timestamp);
-                                      }
-                                    },
-                                    child: AnimatedDefaultTextStyle(
-                                      duration: const Duration(milliseconds: 250),
-                                      curve: Curves.easeOut,
-                                      style: TextStyle(
-                                        color: isCurrent
-                                            ? AppTheme.accentLime
-                                            : AppTheme.textSecondary.withValues(alpha: 0.35),
-                                        fontSize: isCurrent ? 24 : 17,
-                                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-                                        letterSpacing: -0.2,
-                                        height: 1.3,
-                                      ),
-                                      child: Text(
-                                        line.text.isEmpty ? '♪' : line.text,
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
+                                return ListView.builder(
+                                  controller: _lyricsScrollController,
+                                  padding: EdgeInsets.only(
+                                    top: halfHeight - 26.0,
+                                    bottom: halfHeight - 26.0,
+                                    left: 24,
+                                    right: 24,
                                   ),
+                                  itemCount: _lyrics.length,
+                                  itemBuilder: (context, index) {
+                                    final line = _lyrics[index];
+                                    final isCurrent = index == activeIndex;
+
+                                    return Container(
+                                      height: 52.0,
+                                      alignment: Alignment.center,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          if (line.timestamp > Duration.zero) {
+                                            _audioService.seek(line.timestamp);
+                                          }
+                                        },
+                                        child: AnimatedDefaultTextStyle(
+                                          duration: const Duration(milliseconds: 250),
+                                          curve: Curves.easeOut,
+                                          style: TextStyle(
+                                            color: isCurrent
+                                                ? AppTheme.accentLime
+                                                : AppTheme.textSecondary.withValues(alpha: 0.35),
+                                            fontSize: isCurrent ? 24 : 17,
+                                            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                                            letterSpacing: -0.2,
+                                          ),
+                                          child: Text(
+                                            line.text.isEmpty ? '♪' : line.text,
+                                            textAlign: TextAlign.center,
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
                                 );
                               },
                             );

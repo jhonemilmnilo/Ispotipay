@@ -470,7 +470,13 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, index) {
           final track = tracks[index];
           return GestureDetector(
-            onTap: () => _playTrack(track),
+            onTap: () {
+              _playTrack(track);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => PlayerScreen(track: track)),
+              );
+            },
             child: Container(
               width: cardWidth,
               margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -550,6 +556,13 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(10),
       ),
       child: ListTile(
+        onTap: () {
+          _playTrack(track);
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => PlayerScreen(track: track)),
+          );
+        },
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
         leading: ClipRRect(
           borderRadius: BorderRadius.circular(6),
