@@ -127,7 +127,7 @@ class MusicExploreService {
     return [];
   }
 
-  /// Resolve exact matching audio stream URL by song title & artist
+  /// Resolve exact matching playable stream URL by song title & artist
   Future<String?> getAudioStreamUrl(String trackId, {String? title, String? artist}) async {
     try {
       final searchQuery = (title != null && artist != null)
@@ -141,12 +141,21 @@ class MusicExploreService {
           final durationSec = _parseDuration(item.duration) / 1000;
           if (durationSec >= 30 && durationSec <= 600) {
             final manifest = await _yt.videos.streamsClient.getManifest(item.id);
-            // Itag 140 (audio/mp4 m4a) provides standard AAC audio compatible across all devices
-            final audioStream = manifest.audioOnly.firstWhere(
-              (s) => s.tag == 140,
-              orElse: () => manifest.audioOnly.withHighestBitrate(),
-            );
-            return audioStream.url.toString();
+
+            // Progressive stream (itag 18 - 360p mp4) has no SABR/403 throttling
+            // and plays smoothly through ExoPlayer on all Android devices
+            if (manifest.muxed.isNotEmpty) {
+              final progressiveStream = manifest.muxed.firstWhere(
+                (s) => s.tag == 18,
+                orElse: () => manifest.muxed.first,
+              );
+              return progressiveStream.url.toString();
+            }
+
+            // Fallback to highest bitrate audio
+            if (manifest.audioOnly.isNotEmpty) {
+              return manifest.audioOnly.withHighestBitrate().url.toString();
+            }
           }
         }
       }

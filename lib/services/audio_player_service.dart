@@ -56,15 +56,8 @@ class AudioPlayerService {
           artist: track.artist,
         );
         if (streamUrl != null) {
-          // just_audio stream loading
-          await _player.setAudioSource(
-            AudioSource.uri(
-              Uri.parse(streamUrl),
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              },
-            ),
-          );
+          // Play progressive stream directly
+          await _player.setUrl(streamUrl);
         } else {
           throw Exception('Could not resolve audio stream URL');
         }
