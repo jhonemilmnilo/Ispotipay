@@ -21,7 +21,7 @@
 | Language | Dart | ^3.12.0 (SDK) |
 | Framework | Flutter | Stable |
 | UI / Styling | Flutter Material 3 (Dark Minimalist) | Flutter built-in |
-| Database | Local Key-Value / DB (Hive or sqflite) | Latest compatible |
+| Database | Local Relational DB (`sqflite` + `sqflite_common_ffi`) | Latest compatible |
 | Audio Playback | `just_audio` + `audio_service` | Latest compatible |
 | Lyrics Provider | LRCLIB API & Local LRC Parser | REST / Local file |
 | File storage | Device Documents Directory (`path_provider`) | Local only |
