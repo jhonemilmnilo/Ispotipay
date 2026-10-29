@@ -55,7 +55,13 @@ class AudioPlayerService {
           artist: track.artist,
         );
         if (streamUrl != null) {
-          await _player.setUrl(streamUrl);
+          // Provide mobile Android user-agent header to bypass 403 blocks
+          await _player.setUrl(
+            streamUrl,
+            headers: {
+              'User-Agent': 'com.google.android.youtube/19.09.37 (Linux; U; Android 11) gzip',
+            },
+          );
         } else {
           throw Exception('Could not resolve audio stream URL');
         }

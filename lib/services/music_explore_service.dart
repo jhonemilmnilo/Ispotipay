@@ -130,7 +130,6 @@ class MusicExploreService {
   /// Resolve exact matching audio stream URL by song title & artist
   Future<String?> getAudioStreamUrl(String trackId, {String? title, String? artist}) async {
     try {
-      // 1. If song title is provided, search exact song audio
       final searchQuery = (title != null && artist != null)
           ? '$title $artist official audio'
           : trackId;
@@ -139,11 +138,14 @@ class MusicExploreService {
 
       for (final item in searchResults) {
         if (item is SearchVideo) {
-          // Verify duration is a reasonable song (30s to 10 mins)
           final durationSec = _parseDuration(item.duration) / 1000;
           if (durationSec >= 30 && durationSec <= 600) {
             final manifest = await _yt.videos.streamsClient.getManifest(item.id);
-            final audioStream = manifest.audioOnly.withHighestBitrate();
+            // Itag 140 (audio/mp4 m4a) provides standard AAC audio compatible across all devices
+            final audioStream = manifest.audioOnly.firstWhere(
+              (s) => s.tag == 140,
+              orElse: () => manifest.audioOnly.withHighestBitrate(),
+            );
             return audioStream.url.toString();
           }
         }
