@@ -91,14 +91,12 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
     }
   }
 
-  void _playTrack(Track track) async {
-    await _audioService.playTrack(track);
-    if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => PlayerScreen(track: track)),
-      );
-    }
+  void _playTrack(Track track) {
+    _audioService.playTrack(track);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => PlayerScreen(track: track)),
+    );
   }
 
   @override
