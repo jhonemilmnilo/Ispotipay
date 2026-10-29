@@ -20,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final DatabaseService _dbService = DatabaseService();
   final MusicExploreService _exploreService = MusicExploreService();
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   Timer? _debounceTimer;
 
@@ -27,16 +28,18 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Track> _recents = [];
   List<Track> _favorites = [];
   List<Track> _mostPlayed = [];
-  List<Track> _allMusic = [];
+  final List<Track> _allMusic = [];
 
   bool _isLoadingTop = true;
   bool _isLoadingAll = true;
+  bool _isLoadingMoreAll = false;
   bool _isSearching = false;
   List<Track> _searchResults = [];
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _loadAllSections();
   }
 
@@ -44,8 +47,38 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _debounceTimer?.cancel();
     _searchController.dispose();
+    _scrollController.dispose();
     _exploreService.dispose();
     super.dispose();
+  }
+
+  void _onScroll() {
+    // Infinite scroll trigger: when user is 300px away from the bottom
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
+      if (!_isLoadingMoreAll && !_isSearching) {
+        _loadMoreAllMusic();
+      }
+    }
+  }
+
+  Future<void> _loadMoreAllMusic() async {
+    setState(() {
+      _isLoadingMoreAll = true;
+    });
+
+    final newBatch = await _exploreService.fetchNextAllMusicBatch(batchSize: 25);
+    if (mounted) {
+      setState(() {
+        // Prevent duplicate IDs
+        final existingIds = _allMusic.map((t) => t.id).toSet();
+        for (final track in newBatch) {
+          if (!existingIds.contains(track.id)) {
+            _allMusic.add(track);
+          }
+        }
+        _isLoadingMoreAll = false;
+      });
+    }
   }
 
   Future<void> _loadAllSections() async {
@@ -68,12 +101,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchOnlineMusic() async {
     final top = await _exploreService.getTopMusic(limit: 15);
-    final all = await _exploreService.searchTracks('Popular Music Hits');
+    final all = await _exploreService.fetchNextAllMusicBatch(batchSize: 25);
 
     if (mounted) {
       setState(() {
         _topMusic = top;
-        _allMusic = all;
+        _allMusic.clear();
+        _allMusic.addAll(all);
         _isLoadingTop = false;
         _isLoadingAll = false;
       });
@@ -113,6 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: CustomScrollView(
+          controller: _scrollController,
           slivers: [
             // 1. Header & Sticky Search Bar
             SliverToBoxAdapter(
@@ -293,6 +328,22 @@ class _HomeScreenState extends State<HomeScreen> {
                         childCount: _allMusic.length,
                       ),
                     ),
+              if (_isLoadingMoreAll)
+                const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppTheme.accentLime,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
