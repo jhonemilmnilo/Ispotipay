@@ -42,8 +42,15 @@ flowchart TD
 ## 2. Layer Separation & Responsibilities
 
 1. **Presentation / UI (`lib/ui/` or `lib/presentation/`):**
-   - Screens: Home (Trending/Charts), Search, Player/Lyrics Screen, Library (Favorites, Recents, Downloads).
-   - Reusable widgets (PlayerBar, SongTile, LyricsViewer).
+### Home Screen Layout Hierarchy:
+1. **Search Bar** (Sticky top with 400ms debounce)
+2. **Top Music Section** (Horizontal scroll carousel)
+3. **Recent Played Section** (Horizontal scroll carousel, max 15 items)
+4. **Favorites Section** (Horizontal scroll carousel)
+5. **Most Played Section** (Horizontal scroll carousel, max 10 items)
+6. **All Music Section** (Vertical list at the bottom with 25-item chunk infinite scroll)
+
+*Note: All sections above All Music are strictly horizontal scrolling carousels for efficient thumb reach and low rendering cost.*
    - **Performance & Low-End Optimization Rules:**
      - **Infinite Scroll / Pagination:** Fetch 25 items on first load; automatically load the next batch of 25 when the user reaches the bottom of the list. Never fetch full datasets into memory.
      - **Search Debounce (400ms):** User search input must be debounced with a 400ms timer to cancel pending queries while typing, saving network calls, battery, and CPU cycles.
