@@ -18,6 +18,36 @@ class RecommendationEngine {
     'Soul & Blues Modern',
   ];
 
+  // Spotify / YouTube Music Style Musical Neighborhood Knowledge Graph
+  static const Map<String, List<String>> _artistNeighbors = {
+    // Pinoy / OPM
+    'maki': ['dilaw', 'cup of joe', 'lola amour', 'arthur nery', 'adie', 'tj monterde', 'sunshine', 'ben&ben', 'zack tabudlo'],
+    'dilaw': ['maki', 'cup of joe', 'lola amour', 'ben&ben', 'juan karlos', 'the juans', 'over october'],
+    'cup of joe': ['maki', 'dilaw', 'lola amour', 'sunshine', 'adie', 'arthur nery', 'ben&ben'],
+    'lola amour': ['dilaw', 'cup of joe', 'maki', 'ben&ben', 'iv of spades', 'zild', 'autotelic'],
+    'arthur nery': ['adie', 'maki', 'tj monterde', 'dionela', 'mrld', 'rob deniel', 'ace banzinga'],
+    'ben&ben': ['cup of joe', 'lola amour', 'dilaw', 'moira dela torre', 'the juans', 'december avenue', 'maki'],
+    'tj monterde': ['kz tandingan', 'arthur nery', 'adie', 'moira dela torre', 'zack tabudlo', 'dionela'],
+    'adie': ['arthur nery', 'maki', 'rob deniel', 'mrld', 'janine berdin', 'dionela'],
+
+    // Western Pop & Global Chart
+    'billie eilish': ['olivia rodrigo', 'sabrina carpenter', 'phoebe bridgers', 'finneas', 'lana del rey', 'lorde', 'gracie abrams'],
+    'sabrina carpenter': ['olivia rodrigo', 'taylor swift', 'chappell roan', 'ariana grande', 'billie eilish', 'tate mcrae', 'dua lipa'],
+    'olivia rodrigo': ['sabrina carpenter', 'billie eilish', 'taylor swift', 'conan gray', 'chappell roan', 'gracie abrams', 'paramore'],
+    'taylor swift': ['sabrina carpenter', 'gracie abrams', 'olivia rodrigo', 'phoebe bridgers', 'lana del rey', 'ed sheeran', 'harry styles'],
+    'the weeknd': ['post malone', 'dua lipa', 'sza', 'bruno mars', 'khalid', 'frank ocean', 'joji', 'doja cat', 'travis scott'],
+    'bruno mars': ['anderson .paak', 'the weeknd', 'lady gaga', 'post malone', 'charlie puth', 'silk sonic', 'michael jackson'],
+    'sza': ['summer walker', 'jhene aiko', 'the weeknd', 'frank ocean', 'kehlani', 'kali uchis', 'steve lacy', 'brent faiyaz'],
+    'post malone': ['the weeknd', 'khalid', 'juice wrld', 'morgan wallen', 'xxxtentacion', 'mac miller', 'shaboozey'],
+    'chappell roan': ['sabrina carpenter', 'olivia rodrigo', 'renee rapp', 'boygenius', 'muna', 'billie eilish'],
+    'dua lipa': ['calvin harris', 'the weeknd', 'charlie puth', 'tate mcrae', 'ariana grande', 'elton john'],
+
+    // K-Pop / J-Pop
+    'bts': ['jungkook', 'jimin', 'v', 'txt', 'stray kids', 'enhypen', 'seventeen', 'newjeans'],
+    'newjeans': ['illit', 'le sserafim', 'ive', 'twice', 'blackpink', 'aespa', 'boynextdoor'],
+    'blackpink': ['jennie', 'rosé', 'lisa', 'twice', 'aespa', 'newjeans', 'itzy', 'le sserafim'],
+  };
+
   /// Extract weighted taste seeds based on User Favorites, Most Played, and Recents
   Future<List<String>> getTasteSeeds() async {
     final favorites = await _dbService.getFavorites(limit: 25);
@@ -64,6 +94,36 @@ class RecommendationEngine {
       ..sort((a, b) => b.value.compareTo(a.value));
 
     return sorted.map((e) => e.key).toList();
+  }
+
+  /// YouTube Music / Spotify Radio Algorithm:
+  /// Generate context-aware seeds tightly aligned with the currently playing track
+  Future<List<String>> getRadioQueriesForTrack(Track currentTrack, {int count = 6}) async {
+    final cleanArtist = currentTrack.artist.split(RegExp(r'[,&]')).first.trim().toLowerCase();
+    final List<String> queries = [];
+
+    // 1. Direct Musical Neighbors (60% weight - high vibe cohesion)
+    final neighbors = _artistNeighbors[cleanArtist] ?? [];
+    if (neighbors.isNotEmpty) {
+      final shuffled = List<String>.from(neighbors)..shuffle(_random);
+      queries.addAll(shuffled.take(4));
+    } else {
+      // Fallback: search similar songs with title context and related style
+      queries.add('${currentTrack.artist} similar music');
+      queries.add('${currentTrack.artist} radio');
+    }
+
+    // 2. Blend with User Taste Seeds (20% weight - personalized familiarity)
+    final userSeeds = await getTasteSeeds();
+    final familiarSeeds = userSeeds.where((s) => s.toLowerCase() != cleanArtist).toList();
+    if (familiarSeeds.isNotEmpty) {
+      queries.add(familiarSeeds[_random.nextInt(familiarSeeds.length)]);
+    }
+
+    // 3. Ambient Genre Discovery (20% weight - keeps it fresh)
+    queries.add(_discoveryPool[_random.nextInt(_discoveryPool.length)]);
+
+    return queries.take(count).toList();
   }
 
   /// Get distinct seeds for diverse parallel fetching

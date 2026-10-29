@@ -436,6 +436,22 @@ class MusicExploreService {
     );
   }
 
+  /// YouTube Music Radio Queue: Get sonically-aligned Up Next tracks for currently playing track
+  Future<List<Track>> getUpNextQueue(Track currentTrack, {int limit = 20}) async {
+    final radioQueries = await _recEngine.getRadioQueriesForTrack(currentTrack, count: 6);
+    final futureResults = radioQueries.map((q) => searchTracks(q, limit: 6));
+    final fetchedLists = await Future.wait(futureResults);
+
+    final interleaved = _recEngine.interleaveDiverseArtists(
+      fetchedLists,
+      limit: limit,
+      strictUniqueArtists: true,
+    );
+
+    // Filter out the current track itself if it appeared in results
+    return interleaved.where((t) => t.id != currentTrack.id).toList();
+  }
+
   /// Resolve exact matching playable stream URL with strict 0-delay duration delta ranking
   Future<String?> getAudioStreamUrl(
     String trackId, {

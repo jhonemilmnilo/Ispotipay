@@ -5,6 +5,7 @@ import '../models/lyric_line.dart';
 import '../models/track.dart';
 import '../services/audio_player_service.dart';
 import '../services/lyrics_service.dart';
+import '../services/music_explore_service.dart';
 import 'app_theme.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -19,11 +20,15 @@ class PlayerScreen extends StatefulWidget {
 class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin {
   final AudioPlayerService _audioService = AudioPlayerService();
   final LyricsService _lyricsService = LyricsService();
+  final MusicExploreService _exploreService = MusicExploreService();
   late AnimationController _shimmerController;
 
   Track? _activeTrack;
   List<LyricLine> _lyrics = [];
   bool _isLoadingLyrics = true;
+
+  List<Track> _upNextTracks = [];
+  bool _isLoadingUpNext = false;
 
   StreamSubscription<Track?>? _trackSub;
 
@@ -35,6 +40,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
       ..repeat(min: 0.0, max: 1.0, period: const Duration(milliseconds: 1200));
 
     _loadLyrics(_activeTrack!);
+    _loadUpNext(_activeTrack!);
 
     // Listen to live track changes if a new track is selected
     _trackSub = _audioService.currentTrackStream.listen((newTrack) {
@@ -46,6 +52,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
             _isLoadingLyrics = true;
           });
           _loadLyrics(newTrack);
+          _loadUpNext(newTrack);
         }
       }
     });
@@ -55,7 +62,258 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   void dispose() {
     _trackSub?.cancel();
     _shimmerController.dispose();
+    _exploreService.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadUpNext(Track track) async {
+    setState(() {
+      _isLoadingUpNext = true;
+    });
+
+    final queue = await _exploreService.getUpNextQueue(track, limit: 20);
+    if (mounted) {
+      setState(() {
+        _upNextTracks = queue;
+        _isLoadingUpNext = false;
+      });
+    }
+  }
+
+  void _showUpNextDrawer(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.65,
+          minChildSize: 0.35,
+          maxChildSize: 0.92,
+          builder: (sheetContext, scrollController) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFF0A0F1D),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black54,
+                    blurRadius: 20,
+                    offset: Offset(0, -5),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  // YouTube Music Style Grab Handle Pill
+                  const SizedBox(height: 12),
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppTheme.textSecondary.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Drawer Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Up Next',
+                              style: TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Playing from: Radio • Similar to ${_activeTrack?.artist ?? ''}',
+                              style: const TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppTheme.accentLime.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${_upNextTracks.length} tracks',
+                            style: const TextStyle(
+                              color: AppTheme.accentLime,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(color: AppTheme.divider, height: 24),
+
+                  // Currently Playing Indicator Banner
+                  if (_activeTrack != null)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: _activeTrack!.thumbnailUrl != null
+                                ? Image.network(
+                                    _activeTrack!.thumbnailUrl!,
+                                    width: 38,
+                                    height: 38,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, _, _) => Container(
+                                      width: 38,
+                                      height: 38,
+                                      color: AppTheme.surfaceLight,
+                                    ),
+                                  )
+                                : Container(width: 38, height: 38, color: AppTheme.surfaceLight),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    const Icon(Icons.graphic_eq, color: AppTheme.accentLime, size: 14),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'PLAYING NOW',
+                                      style: TextStyle(
+                                        color: AppTheme.accentLime,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _activeTrack!.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppTheme.textPrimary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Up Next Queue List
+                  Expanded(
+                    child: _isLoadingUpNext
+                        ? const Center(
+                            child: CircularProgressIndicator(color: AppTheme.accentLime),
+                          )
+                        : _upNextTracks.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Queue is empty',
+                                  style: TextStyle(color: AppTheme.textSecondary),
+                                ),
+                              )
+                            : ListView.builder(
+                                controller: scrollController,
+                                itemCount: _upNextTracks.length,
+                                itemBuilder: (context, index) {
+                                  final track = _upNextTracks[index];
+                                  return ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 2,
+                                    ),
+                                    leading: ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: track.thumbnailUrl != null
+                                          ? Image.network(
+                                              track.thumbnailUrl!,
+                                              width: 46,
+                                              height: 46,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, _, _) => Container(
+                                                width: 46,
+                                                height: 46,
+                                                color: AppTheme.surfaceLight,
+                                              ),
+                                            )
+                                          : Container(
+                                              width: 46,
+                                              height: 46,
+                                              color: AppTheme.surfaceLight,
+                                            ),
+                                    ),
+                                    title: Text(
+                                      track.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppTheme.textPrimary,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      track.artist,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppTheme.textSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                    trailing: const Icon(
+                                      Icons.play_arrow_rounded,
+                                      color: AppTheme.textSecondary,
+                                      size: 24,
+                                    ),
+                                    onTap: () {
+                                      Navigator.pop(ctx);
+                                      _audioService.playTrack(track);
+                                    },
+                                  );
+                                },
+                              ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> _loadLyrics(Track track) async {
@@ -318,8 +576,20 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       ),
                       const SizedBox(height: 12),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          // Left Side: YouTube Music Style Up Next Queue Button
+                          IconButton(
+                            icon: const Icon(
+                              Icons.queue_music,
+                              color: AppTheme.textPrimary,
+                              size: 26,
+                            ),
+                            tooltip: 'Up Next',
+                            onPressed: () => _showUpNextDrawer(context),
+                          ),
+
+                          // Center: Play / Pause Control
                           StreamBuilder<PlayerState>(
                             stream: _audioService.playerStateStream,
                             builder: (context, snapshot) {
@@ -348,6 +618,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               );
                             },
                           ),
+
+                          // Right Side spacer or balance placeholder
+                          const SizedBox(width: 48),
                         ],
                       ),
                     ],
