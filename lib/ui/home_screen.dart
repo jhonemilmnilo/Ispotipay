@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/track.dart';
 import '../services/audio_player_service.dart';
 import '../services/database_service.dart';
+import '../services/download_service.dart';
 import '../services/music_explore_service.dart';
 import 'app_theme.dart';
 import 'mini_player_bar.dart';
@@ -530,6 +531,37 @@ class _HomeScreenState extends State<HomeScreen> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            IconButton(
+              icon: Icon(
+                track.isDownloaded ? Icons.download_done : Icons.download_outlined,
+                color: track.isDownloaded ? AppTheme.accentLime : AppTheme.textSecondary,
+                size: 20,
+              ),
+              onPressed: () async {
+                if (track.isDownloaded) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Song already downloaded')),
+                  );
+                  return;
+                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Downloading "${track.title}" + lyrics...')),
+                );
+                final downloaded = await DownloadService().downloadTrack(track);
+                if (downloaded != null && mounted) {
+                  _loadAllSections();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      backgroundColor: AppTheme.surfaceLight,
+                      content: Text(
+                        'Downloaded with lyrics! Ready for offline.',
+                        style: TextStyle(color: AppTheme.accentLime),
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.favorite_border, color: AppTheme.textSecondary, size: 20),
               onPressed: () async {
