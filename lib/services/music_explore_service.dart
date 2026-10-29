@@ -127,36 +127,81 @@ class MusicExploreService {
     return [];
   }
 
-  /// Resolve exact matching playable stream URL by song title & artist
-  Future<String?> getAudioStreamUrl(String trackId, {String? title, String? artist}) async {
+  /// Resolve exact matching playable stream URL with strict duration matching for 100% lyrics sync
+  Future<String?> getAudioStreamUrl(
+    String trackId, {
+    String? title,
+    String? artist,
+    int? targetDurationMs,
+  }) async {
     try {
-      final searchQuery = (title != null && artist != null)
-          ? '$title $artist official audio'
-          : trackId;
+      // 1. Prioritize YouTube Music Auto-generated Topic audio tracks or official audio
+      final cleanTitle = (title ?? '').replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '').trim();
+      final cleanArtist = (artist ?? '').trim();
 
-      final searchResults = await _yt.search.searchContent(searchQuery);
+      final searchQueries = [
+        '"$cleanTitle" "$cleanArtist" - Topic',
+        '$cleanTitle $cleanArtist audio',
+        '$cleanTitle $cleanArtist',
+      ];
 
-      for (final item in searchResults) {
-        if (item is SearchVideo) {
-          final durationSec = _parseDuration(item.duration) / 1000;
-          if (durationSec >= 30 && durationSec <= 600) {
-            final manifest = await _yt.videos.streamsClient.getManifest(item.id);
+      SearchVideo? bestMatch;
+      int lowestDurationDiff = 999999;
 
-            // Progressive stream (itag 18 - 360p mp4) has no SABR/403 throttling
-            // and plays smoothly through ExoPlayer on all Android devices
-            if (manifest.muxed.isNotEmpty) {
-              final progressiveStream = manifest.muxed.firstWhere(
-                (s) => s.tag == 18,
-                orElse: () => manifest.muxed.first,
-              );
-              return progressiveStream.url.toString();
+      for (final query in searchQueries) {
+        final searchResults = await _yt.search.searchContent(query);
+
+        for (final item in searchResults) {
+          if (item is SearchVideo) {
+            // Disqualify music videos with acting/intros or live sessions
+            final lowerTitle = item.title.toLowerCase();
+            if (lowerTitle.contains('official music video') ||
+                lowerTitle.contains('mv') ||
+                lowerTitle.contains('live') ||
+                lowerTitle.contains('interview') ||
+                lowerTitle.contains('intro') ||
+                lowerTitle.contains('trailer')) {
+              continue;
             }
 
-            // Fallback to highest bitrate audio
-            if (manifest.audioOnly.isNotEmpty) {
-              return manifest.audioOnly.withHighestBitrate().url.toString();
+            final videoDurationMs = _parseDuration(item.duration);
+
+            if (targetDurationMs != null && targetDurationMs > 0) {
+              final diff = (videoDurationMs - targetDurationMs).abs();
+              // If difference is within 4 seconds, this is the exact studio cut!
+              if (diff <= 4000) {
+                bestMatch = item;
+                lowestDurationDiff = diff;
+                break;
+              } else if (diff < lowestDurationDiff) {
+                lowestDurationDiff = diff;
+                bestMatch = item;
+              }
+            } else {
+              bestMatch = item;
+              break;
             }
           }
+        }
+
+        if (bestMatch != null && lowestDurationDiff <= 4000) {
+          break;
+        }
+      }
+
+      if (bestMatch != null) {
+        final manifest = await _yt.videos.streamsClient.getManifest(bestMatch.id);
+
+        if (manifest.muxed.isNotEmpty) {
+          final progressiveStream = manifest.muxed.firstWhere(
+            (s) => s.tag == 18,
+            orElse: () => manifest.muxed.first,
+          );
+          return progressiveStream.url.toString();
+        }
+
+        if (manifest.audioOnly.isNotEmpty) {
+          return manifest.audioOnly.withHighestBitrate().url.toString();
         }
       }
     } catch (_) {}

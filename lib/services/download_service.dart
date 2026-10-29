@@ -34,11 +34,12 @@ class DownloadService {
       final audioFilePath = p.join(tracksDir.path, '$safeId.m4a');
       final lyricsFilePath = p.join(lyricsDir.path, '$safeId.lrc');
 
-      // 1. Resolve exact audio stream via MusicExploreService
+      // 1. Resolve exact audio stream via MusicExploreService with studio duration matching
       final streamUrl = await _exploreService.getAudioStreamUrl(
         track.id,
         title: track.title,
         artist: track.artist,
+        targetDurationMs: track.durationMs,
       );
 
       if (streamUrl == null) return null;

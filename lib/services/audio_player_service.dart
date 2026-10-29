@@ -49,11 +49,12 @@ class AudioPlayerService {
         // Play local offline file
         await _player.setFilePath(track.audioPath!);
       } else {
-        // 1. Resolve online stream URL via exact title & artist
+        // 1. Resolve online stream URL via exact title, artist, and studio duration
         final streamUrl = await _exploreService.getAudioStreamUrl(
           track.id,
           title: track.title,
           artist: track.artist,
+          targetDurationMs: track.durationMs,
         );
         if (streamUrl != null) {
           // Play progressive stream directly
