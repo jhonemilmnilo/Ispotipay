@@ -5,21 +5,30 @@ import '../models/track.dart';
 class MusicExploreService {
   final YoutubeExplode _yt = YoutubeExplode();
 
-  /// Search tracks with query
+  /// Search tracks safely using searchContent
   Future<List<Track>> searchTracks(String query) async {
     if (query.trim().isEmpty) return [];
 
     try {
-      final searchList = await _yt.search.search(query);
-      return searchList.take(25).map((video) {
-        return Track(
-          id: video.id.value,
-          title: video.title,
-          artist: video.author,
-          durationMs: video.duration?.inMilliseconds ?? 0,
-          thumbnailUrl: video.thumbnails.mediumResUrl,
-        );
-      }).toList();
+      final searchResults = await _yt.search.searchContent(query);
+      final List<Track> tracks = [];
+
+      for (final item in searchResults) {
+        if (item is SearchVideo) {
+          final thumb = item.thumbnails.isNotEmpty ? item.thumbnails.last.url.toString() : null;
+          tracks.add(
+            Track(
+              id: item.id.value,
+              title: item.title,
+              artist: item.author,
+              durationMs: _parseDuration(item.duration),
+              thumbnailUrl: thumb,
+            ),
+          );
+        }
+        if (tracks.length >= 25) break;
+      }
+      return tracks;
     } catch (_) {
       return [];
     }
@@ -28,17 +37,25 @@ class MusicExploreService {
   /// Get Top / Trending Music
   Future<List<Track>> getTopMusic({int limit = 15}) async {
     try {
-      // Search for top trending music songs
-      final results = await _yt.search.search('Top Trending Music Hits');
-      return results.take(limit).map((video) {
-        return Track(
-          id: video.id.value,
-          title: video.title,
-          artist: video.author,
-          durationMs: video.duration?.inMilliseconds ?? 0,
-          thumbnailUrl: video.thumbnails.mediumResUrl,
-        );
-      }).toList();
+      final searchResults = await _yt.search.searchContent('Billboard Hot 100 Hits Official');
+      final List<Track> tracks = [];
+
+      for (final item in searchResults) {
+        if (item is SearchVideo) {
+          final thumb = item.thumbnails.isNotEmpty ? item.thumbnails.last.url.toString() : null;
+          tracks.add(
+            Track(
+              id: item.id.value,
+              title: item.title,
+              artist: item.author,
+              durationMs: _parseDuration(item.duration),
+              thumbnailUrl: thumb,
+            ),
+          );
+        }
+        if (tracks.length >= limit) break;
+      }
+      return tracks;
     } catch (_) {
       return [];
     }
@@ -55,8 +72,19 @@ class MusicExploreService {
     }
   }
 
+  int _parseDuration(String durationStr) {
+    try {
+      final parts = durationStr.split(':').map(int.parse).toList();
+      if (parts.length == 2) {
+        return (parts[0] * 60 + parts[1]) * 1000;
+      } else if (parts.length == 3) {
+        return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
+      }
+    } catch (_) {}
+    return 0;
+  }
+
   void dispose() {
     _yt.close();
   }
 }
-
