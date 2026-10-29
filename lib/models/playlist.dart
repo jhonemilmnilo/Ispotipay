@@ -13,3 +13,4 @@ class Playlist {
     required this.searchQuery,
   });
 }
+

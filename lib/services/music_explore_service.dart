@@ -169,7 +169,7 @@ class MusicExploreService {
     return [];
   }
 
-  /// Resolve exact matching playable stream URL with strict duration matching for 100% lyrics sync
+  /// Resolve exact matching playable stream URL with strict 0-delay duration delta ranking
   Future<String?> getAudioStreamUrl(
     String trackId, {
     String? title,
@@ -177,74 +177,65 @@ class MusicExploreService {
     int? targetDurationMs,
   }) async {
     try {
-      // 1. Prioritize YouTube Music Auto-generated Topic audio tracks or official audio
       final cleanTitle = (title ?? '').replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '').trim();
       final cleanArtist = (artist ?? '').trim();
 
-      final searchQueries = [
-        '"$cleanTitle" "$cleanArtist" - Topic',
+      // Search across clean lyric videos and official studio audio tracks
+      final queries = [
+        '$cleanTitle $cleanArtist lyrics',
         '$cleanTitle $cleanArtist audio',
-        '$cleanTitle $cleanArtist',
+        '"$cleanTitle" "$cleanArtist" - Topic',
       ];
 
-      SearchVideo? bestMatch;
-      int lowestDurationDiff = 999999;
+      final List<SearchVideo> allCandidates = [];
 
-      for (final query in searchQueries) {
-        final searchResults = await _yt.search.searchContent(query);
-
-        for (final item in searchResults) {
+      for (final query in queries) {
+        final results = await _yt.search.searchContent(query);
+        for (final item in results) {
           if (item is SearchVideo) {
-            // Disqualify music videos with acting/intros or live sessions
             final lowerTitle = item.title.toLowerCase();
+            // Disqualify long music videos, live performances, and interviews with intros
             if (lowerTitle.contains('official music video') ||
-                lowerTitle.contains('mv') ||
+                lowerTitle.contains(' mv ') ||
                 lowerTitle.contains('live') ||
                 lowerTitle.contains('interview') ||
                 lowerTitle.contains('intro') ||
-                lowerTitle.contains('trailer')) {
+                lowerTitle.contains('trailer') ||
+                lowerTitle.contains('reaction')) {
               continue;
             }
-
-            final videoDurationMs = _parseDuration(item.duration);
-
-            if (targetDurationMs != null && targetDurationMs > 0) {
-              final diff = (videoDurationMs - targetDurationMs).abs();
-              // If difference is within 4 seconds, this is the exact studio cut!
-              if (diff <= 4000) {
-                bestMatch = item;
-                lowestDurationDiff = diff;
-                break;
-              } else if (diff < lowestDurationDiff) {
-                lowestDurationDiff = diff;
-                bestMatch = item;
-              }
-            } else {
-              bestMatch = item;
-              break;
-            }
+            allCandidates.add(item);
           }
         }
-
-        if (bestMatch != null && lowestDurationDiff <= 4000) {
-          break;
-        }
+        if (allCandidates.length >= 12) break;
       }
 
-      if (bestMatch != null) {
-        final manifest = await _yt.videos.streamsClient.getManifest(bestMatch.id);
+      if (allCandidates.isEmpty) return null;
 
-        if (manifest.muxed.isNotEmpty) {
-          final progressiveStream = manifest.muxed.firstWhere(
-            (s) => s.tag == 18,
-            orElse: () => manifest.muxed.first,
-          );
-          return progressiveStream.url.toString();
-        }
+      // Sort all candidates by lowest duration delta (gap between video and studio track)
+      if (targetDurationMs != null && targetDurationMs > 0) {
+        allCandidates.sort((a, b) {
+          final diffA = (_parseDuration(a.duration) - targetDurationMs).abs();
+          final diffB = (_parseDuration(b.duration) - targetDurationMs).abs();
+          return diffA.compareTo(diffB);
+        });
+      }
 
-        if (manifest.audioOnly.isNotEmpty) {
-          return manifest.audioOnly.withHighestBitrate().url.toString();
-        }
+      // Pick the best candidate (lowest delta, closest to exact studio cut)
+      final bestMatch = allCandidates.first;
+
+      final manifest = await _yt.videos.streamsClient.getManifest(bestMatch.id);
+
+      if (manifest.muxed.isNotEmpty) {
+        final progressiveStream = manifest.muxed.firstWhere(
+          (s) => s.tag == 18,
+          orElse: () => manifest.muxed.first,
+        );
+        return progressiveStream.url.toString();
+      }
+
+      if (manifest.audioOnly.isNotEmpty) {
+        return manifest.audioOnly.withHighestBitrate().url.toString();
       }
     } catch (_) {}
 
