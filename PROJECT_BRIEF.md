@@ -54,6 +54,9 @@
 
 ## 4. Quality & Performance Requirements
 
-- **Low-end Device Optimization:** RAM usage strictly managed; lazy-loading for long lists; dark theme with high contrast and zero GPU-heavy blur effects.
+- **Low-end Device Optimization:** 
+  - RAM usage strictly managed; lazy-loading and pagination for all long lists (initial 25 items, fetch 25 more on bottom scroll / infinite scroll).
+  - Search input debounced at 400ms to eliminate unnecessary API overhead and avoid UI stutter.
+  - Dark theme with high contrast and zero GPU-heavy blur effects (`BackdropFilter`).
 - **Offline First:** Playback of downloaded files must work without any internet handshake or remote ping.
 - **Audio Stutter Prevention:** Pre-buffering and local file caching.

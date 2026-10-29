@@ -80,7 +80,9 @@ ispotipay/
 **Code style**
 - Strict lints enabled via `flutter_lints`.
 - Performance first: Avoid deep widget trees, use `const` constructors wherever possible.
-- Avoid memory leaks: Always dispose audio player controllers and stream subscriptions.
+- Avoid memory leaks: Always dispose audio player controllers, search debounce timers, and stream subscriptions.
+- Data pagination: All song lists (charts, search, library) must follow the 25-item chunk pagination with infinite scroll.
+- Search input: Always apply a 400ms debounce before dispatching search API calls.
 
 **Data & Privacy**
 - Favorites and Recents must NEVER leave the device. Stored locally only.

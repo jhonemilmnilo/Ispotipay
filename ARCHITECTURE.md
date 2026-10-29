@@ -44,7 +44,10 @@ flowchart TD
 1. **Presentation / UI (`lib/ui/` or `lib/presentation/`):**
    - Screens: Home (Trending/Charts), Search, Player/Lyrics Screen, Library (Favorites, Recents, Downloads).
    - Reusable widgets (PlayerBar, SongTile, LyricsViewer).
-   - **Performance Rule:** Avoid heavy blur (`BackdropFilter`) and continuous unthrottled rebuilds for low-end device smoothness.
+   - **Performance & Low-End Optimization Rules:**
+     - **Infinite Scroll / Pagination:** Fetch 25 items on first load; automatically load the next batch of 25 when the user reaches the bottom of the list. Never fetch full datasets into memory.
+     - **Search Debounce (400ms):** User search input must be debounced with a 400ms timer to cancel pending queries while typing, saving network calls, battery, and CPU cycles.
+     - **Render Budget:** Avoid heavy blur (`BackdropFilter`) and continuous unthrottled widget rebuilds. Keep widget trees flat and use `const` constructors aggressively.
 2. **State Management (`lib/logic/` or `lib/providers/`):**
    - Player State (current track, duration, position, buffering, play/pause/shuffle/repeat).
    - Lyrics State (current line index based on position milliseconds).
