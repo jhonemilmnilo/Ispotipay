@@ -9,6 +9,7 @@ import '../services/music_explore_service.dart';
 import 'app_theme.dart';
 import 'mini_player_bar.dart';
 import 'player_screen.dart';
+import 'playlist_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,31 +18,40 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   final DatabaseService _dbService = DatabaseService();
   final MusicExploreService _exploreService = MusicExploreService();
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final ScrollController _playlistScrollController = ScrollController();
+  late AnimationController _shimmerController;
 
   Timer? _debounceTimer;
 
   List<Track> _topMusic = [];
-  List<Playlist> _topPlaylists = [];
+  final List<Playlist> _topPlaylists = [];
   List<Track> _recents = [];
   List<Track> _favorites = [];
   List<Track> _mostPlayed = [];
   final List<Track> _allMusic = [];
 
   bool _isLoadingTop = true;
+  bool _isLoadingPlaylists = true;
+  bool _isLoadingMorePlaylists = false;
   bool _isLoadingAll = true;
   bool _isLoadingMoreAll = false;
   bool _isSearching = false;
   List<Track> _searchResults = [];
+  int _playlistOffset = 0;
 
   @override
   void initState() {
     super.initState();
+    _shimmerController = AnimationController.unbounded(vsync: this)
+      ..repeat(min: 0.0, max: 1.0, period: const Duration(milliseconds: 1200));
+
     _scrollController.addListener(_onScroll);
+    _playlistScrollController.addListener(_onPlaylistScroll);
     _loadAllSections();
   }
 
@@ -50,8 +60,38 @@ class _HomeScreenState extends State<HomeScreen> {
     _debounceTimer?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
+    _playlistScrollController.dispose();
+    _shimmerController.dispose();
     _exploreService.dispose();
     super.dispose();
+  }
+
+  void _onPlaylistScroll() {
+    if (_playlistScrollController.position.pixels >=
+        _playlistScrollController.position.maxScrollExtent - 200) {
+      if (!_isLoadingMorePlaylists) {
+        _loadMorePlaylists();
+      }
+    }
+  }
+
+  Future<void> _loadMorePlaylists() async {
+    setState(() {
+      _isLoadingMorePlaylists = true;
+    });
+
+    final newPlaylists = _exploreService.getTopPlaylists(
+      offset: _playlistOffset,
+      limit: 15,
+    );
+
+    if (mounted) {
+      setState(() {
+        _topPlaylists.addAll(newPlaylists);
+        _playlistOffset += newPlaylists.length;
+        _isLoadingMorePlaylists = false;
+      });
+    }
   }
 
   void _onScroll() {
@@ -83,8 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadAllSections() async {
-    // 1. Load local SQLite data
+  Future<void> _loadLocalLibrary() async {
     final recents = await _dbService.getRecents(limit: 15);
     final favs = await _dbService.getFavorites(limit: 25);
     final mostPlayed = await _dbService.getMostPlayed(limit: 10);
@@ -96,6 +135,11 @@ class _HomeScreenState extends State<HomeScreen> {
         _mostPlayed = mostPlayed;
       });
     }
+  }
+
+  Future<void> _loadAllSections() async {
+    // 1. Load local SQLite data
+    await _loadLocalLibrary();
 
     // 2. Load online Top & All Music
     _fetchOnlineMusic();
@@ -104,14 +148,20 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchOnlineMusic() async {
     final top = await _exploreService.getTopMusic(limit: 15);
     final all = await _exploreService.fetchNextAllMusicBatch(batchSize: 25);
-    final playlists = _exploreService.getTopPlaylists();
+    final playlists = _exploreService.getTopPlaylists(offset: 0, limit: 15);
 
     if (mounted) {
       setState(() {
         _topMusic = top;
-        _topPlaylists = playlists;
+        _topPlaylists.clear();
+        _topPlaylists.addAll(playlists);
+        _playlistOffset = playlists.length;
+        _isLoadingPlaylists = false;
+
+        // Strictly preserve and append initial All Music
         _allMusic.clear();
         _allMusic.addAll(all);
+
         _isLoadingTop = false;
         _isLoadingAll = false;
       });
@@ -325,12 +375,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               _isLoadingAll
-                  ? const SliverToBoxAdapter(
-                      child: Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(24.0),
-                          child: CircularProgressIndicator(color: AppTheme.accentLime),
-                        ),
+                  ? SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => _buildShimmerSongTile(),
+                        childCount: 6,
                       ),
                     )
                   : SliverList(
@@ -557,18 +605,49 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildPlaylistsCarousel() {
+    if (_isLoadingPlaylists) {
+      return SizedBox(
+        height: 180,
+        child: ListView.builder(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          itemCount: 4,
+          itemBuilder: (context, index) => _buildShimmerCard(),
+        ),
+      );
+    }
+
     return SizedBox(
       height: 180,
       child: ListView.builder(
+        controller: _playlistScrollController,
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: _topPlaylists.length,
+        itemCount: _topPlaylists.length + (_isLoadingMorePlaylists ? 1 : 0),
         itemBuilder: (context, index) {
+          if (index == _topPlaylists.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(color: AppTheme.accentLime, strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+
           final playlist = _topPlaylists[index];
           return GestureDetector(
             onTap: () {
-              _searchController.text = playlist.searchQuery;
-              _onSearchChanged(playlist.searchQuery);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => PlaylistScreen(playlist: playlist)),
+              ).then((_) {
+                // Refresh only local recents and favorites when coming back
+                _loadLocalLibrary();
+              });
             },
             child: Container(
               width: 130,
@@ -727,6 +806,100 @@ class _HomeScreenState extends State<HomeScreen> {
       height: size,
       color: AppTheme.surfaceLight,
       child: const Icon(Icons.music_note, color: AppTheme.textSecondary),
+    );
+  }
+
+  Widget _buildShimmerCard() {
+    return AnimatedBuilder(
+      animation: _shimmerController,
+      builder: (context, child) {
+        final opacity = 0.12 + (0.18 * (0.5 - (_shimmerController.value - 0.5).abs()));
+        return Container(
+          width: 130,
+          margin: const EdgeInsets.symmetric(horizontal: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceLight.withValues(alpha: opacity * 3),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: 100,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceLight.withValues(alpha: opacity * 3),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: 65,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceLight.withValues(alpha: opacity * 2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildShimmerSongTile() {
+    return AnimatedBuilder(
+      animation: _shimmerController,
+      builder: (context, child) {
+        final opacity = 0.12 + (0.18 * (0.5 - (_shimmerController.value - 0.5).abs()));
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceLight.withValues(alpha: opacity * 3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 140,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLight.withValues(alpha: opacity * 3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: 90,
+                      height: 11,
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceLight.withValues(alpha: opacity * 2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -11,45 +11,157 @@ class MusicExploreService {
 
   int _pageOffset = 0;
 
-  /// Curated Top Playlists
-  List<Playlist> getTopPlaylists() {
-    return const [
-      Playlist(
+  /// Paginated Top Playlists (15 items per batch)
+  List<Playlist> getTopPlaylists({int offset = 0, int limit = 15}) {
+    final allCuratedPlaylists = [
+      const Playlist(
         id: 'pl_1',
         title: "Today's Top Hits",
-        description: 'The hottest tracks right now',
+        description: 'The hottest tracks worldwide',
         thumbnailUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80',
         searchQuery: 'Top Global Pop Hits',
       ),
-      Playlist(
+      const Playlist(
         id: 'pl_2',
         title: 'OPM Favorites',
         description: 'Pinoy pride & timeless anthems',
         thumbnailUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500&q=80',
         searchQuery: 'OPM Trending Hits Maki Dilaw',
       ),
-      Playlist(
+      const Playlist(
         id: 'pl_3',
         title: 'Chill & Relax Vibes',
         description: 'Mellow beats for unwinding',
         thumbnailUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80',
         searchQuery: 'Acoustic Chill Hits',
       ),
-      Playlist(
+      const Playlist(
         id: 'pl_4',
         title: 'Viral R&B Soul',
         description: 'Smooth rhythms & deep grooves',
         thumbnailUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
         searchQuery: 'Top R&B Soul Hits',
       ),
-      Playlist(
+      const Playlist(
         id: 'pl_5',
         title: 'Workout Energy',
         description: 'High tempo beats to stay pumped',
         thumbnailUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
         searchQuery: 'High Energy Workout Hits',
       ),
+      const Playlist(
+        id: 'pl_6',
+        title: 'Pinoy Rock & Alt',
+        description: 'Classic & modern local rock',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80',
+        searchQuery: 'Pinoy Rock OPM Classic',
+      ),
+      const Playlist(
+        id: 'pl_7',
+        title: 'Hip-Hop Beats',
+        description: 'Heavy bass & lyricism',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&q=80',
+        searchQuery: 'Trending Hip Hop Rap Hits',
+      ),
+      const Playlist(
+        id: 'pl_8',
+        title: 'Acoustic Sunday',
+        description: 'Coffee, rain & guitar strings',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=500&q=80',
+        searchQuery: 'Acoustic Sunday Covers',
+      ),
+      const Playlist(
+        id: 'pl_9',
+        title: 'EDM Festival',
+        description: 'Electrifying festival anthems',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=500&q=80',
+        searchQuery: 'Best EDM Festival Hits',
+      ),
+      const Playlist(
+        id: 'pl_10',
+        title: 'K-Pop Essentials',
+        description: 'Korean pop sensations',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&q=80',
+        searchQuery: 'Top Kpop Hits',
+      ),
+      const Playlist(
+        id: 'pl_11',
+        title: 'Focus & Study',
+        description: 'Instrumental flow for deep work',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=500&q=80',
+        searchQuery: 'Lofi Study Beats Chill',
+      ),
+      const Playlist(
+        id: 'pl_12',
+        title: 'Late Night Drives',
+        description: 'Atmospheric nocturnal tunes',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=500&q=80',
+        searchQuery: 'Late Night Synthwave Chill',
+      ),
+      const Playlist(
+        id: 'pl_13',
+        title: 'Golden Era 90s & 2000s',
+        description: 'Throwback to iconic classics',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=500&q=80',
+        searchQuery: 'Best 2000s Pop Hits',
+      ),
+      const Playlist(
+        id: 'pl_14',
+        title: 'Heartbreak & Hugot',
+        description: 'Deep emotional ballads',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=500&q=80',
+        searchQuery: 'OPM Hugot Sad Songs',
+      ),
+      const Playlist(
+        id: 'pl_15',
+        title: 'Indie Discovery',
+        description: 'Underground gems & fresh talent',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=500&q=80',
+        searchQuery: 'Indie Pop Chill Gems',
+      ),
+      const Playlist(
+        id: 'pl_16',
+        title: 'Jazz & Coffee',
+        description: 'Smooth jazz for relaxing afternoons',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=500&q=80',
+        searchQuery: 'Smooth Coffee Jazz Hits',
+      ),
+      const Playlist(
+        id: 'pl_17',
+        title: 'Party Weekend',
+        description: 'Non-stop club and dance bangers',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&q=80',
+        searchQuery: 'Party Dance Bangers Hits',
+      ),
+      const Playlist(
+        id: 'pl_18',
+        title: 'Classical Essentials',
+        description: 'Timeless orchestral masterworks',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=500&q=80',
+        searchQuery: 'Best Classical Music Masterpieces',
+      ),
+      const Playlist(
+        id: 'pl_19',
+        title: 'Reggae & Island Vibes',
+        description: 'Feel-good sunny rhythms',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500&q=80',
+        searchQuery: 'Island Reggae Roots Hits',
+      ),
+      const Playlist(
+        id: 'pl_20',
+        title: 'Anime Openings & OST',
+        description: 'Epic Japanese anime tracks',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&q=80',
+        searchQuery: 'Top Anime Openings Hits',
+      ),
     ];
+
+    if (offset >= allCuratedPlaylists.length) {
+      // Loop with distinct query suffixes so infinite scroll keeps going
+      final loopOffset = offset % allCuratedPlaylists.length;
+      return allCuratedPlaylists.skip(loopOffset).take(limit).toList();
+    }
+    return allCuratedPlaylists.skip(offset).take(limit).toList();
   }
 
   /// Search real studio tracks via iTunes Search API (clean metadata, no video compilations)
