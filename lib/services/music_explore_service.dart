@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart' hide Playlist;
+import '../models/playlist.dart';
 import '../models/track.dart';
 
 class MusicExploreService {
@@ -9,6 +10,47 @@ class MusicExploreService {
   final http.Client _httpClient = http.Client();
 
   int _pageOffset = 0;
+
+  /// Curated Top Playlists
+  List<Playlist> getTopPlaylists() {
+    return const [
+      Playlist(
+        id: 'pl_1',
+        title: "Today's Top Hits",
+        description: 'The hottest tracks right now',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80',
+        searchQuery: 'Top Global Pop Hits',
+      ),
+      Playlist(
+        id: 'pl_2',
+        title: 'OPM Favorites',
+        description: 'Pinoy pride & timeless anthems',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500&q=80',
+        searchQuery: 'OPM Trending Hits Maki Dilaw',
+      ),
+      Playlist(
+        id: 'pl_3',
+        title: 'Chill & Relax Vibes',
+        description: 'Mellow beats for unwinding',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80',
+        searchQuery: 'Acoustic Chill Hits',
+      ),
+      Playlist(
+        id: 'pl_4',
+        title: 'Viral R&B Soul',
+        description: 'Smooth rhythms & deep grooves',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
+        searchQuery: 'Top R&B Soul Hits',
+      ),
+      Playlist(
+        id: 'pl_5',
+        title: 'Workout Energy',
+        description: 'High tempo beats to stay pumped',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500&q=80',
+        searchQuery: 'High Energy Workout Hits',
+      ),
+    ];
+  }
 
   /// Search real studio tracks via iTunes Search API (clean metadata, no video compilations)
   Future<List<Track>> searchTracks(String query, {int limit = 25}) async {
