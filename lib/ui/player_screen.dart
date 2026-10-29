@@ -227,13 +227,17 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                     width: 38,
                                     height: 38,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (_, _, _) => Container(
-                                      width: 38,
-                                      height: 38,
-                                      color: AppTheme.surfaceLight,
+                                    errorBuilder: (_, _, _) => _buildCustomThumbnail(
+                                      title: _activeTrack!.title,
+                                      artist: _activeTrack!.artist,
+                                      size: 38,
                                     ),
                                   )
-                                : Container(width: 38, height: 38, color: AppTheme.surfaceLight),
+                                : _buildCustomThumbnail(
+                                    title: _activeTrack!.title,
+                                    artist: _activeTrack!.artist,
+                                    size: 38,
+                                  ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -316,16 +320,16 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                                 width: 46,
                                                 height: 46,
                                                 fit: BoxFit.cover,
-                                                errorBuilder: (_, _, _) => Container(
-                                                  width: 46,
-                                                  height: 46,
-                                                  color: AppTheme.surfaceLight,
+                                                errorBuilder: (_, _, _) => _buildCustomThumbnail(
+                                                  title: track.title,
+                                                  artist: track.artist,
+                                                  size: 46,
                                                 ),
                                               )
-                                            : Container(
-                                                width: 46,
-                                                height: 46,
-                                                color: AppTheme.surfaceLight,
+                                            : _buildCustomThumbnail(
+                                                title: track.title,
+                                                artist: track.artist,
+                                                size: 46,
                                               ),
                                       ),
                                       title: Text(
@@ -727,6 +731,71 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCustomThumbnail({
+    required String title,
+    required String artist,
+    double size = 46,
+  }) {
+    // Deterministic accent shade based on title character
+    final int charCode = title.isNotEmpty ? title.codeUnitAt(0) : 65;
+    final List<Color> gradientColors = [
+      const Color(0xFF1558C9),
+      Color.lerp(const Color(0xFF030407), const Color(0xFF1558C9), (charCode % 5) / 10)!,
+      const Color(0xFF0A0F1D),
+    ];
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradientColors,
+        ),
+        borderRadius: BorderRadius.circular(size * 0.16),
+        border: Border.all(
+          color: AppTheme.accentLime.withValues(alpha: 0.25),
+          width: 0.8,
+        ),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Vinyl disc grooves illusion
+          Container(
+            width: size * 0.75,
+            height: size * 0.75,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+                width: 0.8,
+              ),
+            ),
+          ),
+          Container(
+            width: size * 0.5,
+            height: size * 0.5,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12),
+                width: 0.8,
+              ),
+            ),
+          ),
+          // Center Cyber Lime Icon
+          Icon(
+            Icons.music_note_rounded,
+            color: AppTheme.accentLime,
+            size: size * 0.45,
+          ),
+        ],
+      ),
     );
   }
 
