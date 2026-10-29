@@ -63,11 +63,13 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (index != _activeLineIndex) {
       _activeLineIndex = index;
       if (_lyricsScrollController.hasClients) {
-        final targetOffset = (index * 48.0) - 100.0;
+        // Calculate offset so the active line sits dead-center in the viewport
+        final viewportHeight = _lyricsScrollController.position.viewportDimension;
+        final targetOffset = (index * 56.0) - (viewportHeight / 2) + 28.0;
         _lyricsScrollController.animateTo(
           targetOffset.clamp(0.0, _lyricsScrollController.position.maxScrollExtent),
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
         );
       }
     }
@@ -178,29 +180,38 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
                             return ListView.builder(
                               controller: _lyricsScrollController,
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: MediaQuery.of(context).size.height * 0.25,
+                              ),
                               itemCount: _lyrics.length,
                               itemBuilder: (context, index) {
                                 final line = _lyrics[index];
                                 final isCurrent = index == activeIndex;
 
                                 return Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
                                   child: GestureDetector(
                                     onTap: () {
                                       if (line.timestamp > Duration.zero) {
                                         _audioService.seek(line.timestamp);
                                       }
                                     },
-                                    child: Text(
-                                      line.text.isEmpty ? '♪' : line.text,
+                                    child: AnimatedDefaultTextStyle(
+                                      duration: const Duration(milliseconds: 250),
+                                      curve: Curves.easeOut,
                                       style: TextStyle(
                                         color: isCurrent
                                             ? AppTheme.accentLime
-                                            : AppTheme.textSecondary.withValues(alpha: 0.5),
-                                        fontSize: isCurrent ? 22 : 16,
+                                            : AppTheme.textSecondary.withValues(alpha: 0.35),
+                                        fontSize: isCurrent ? 24 : 17,
                                         fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
                                         letterSpacing: -0.2,
+                                        height: 1.3,
+                                      ),
+                                      child: Text(
+                                        line.text.isEmpty ? '♪' : line.text,
+                                        textAlign: TextAlign.center,
                                       ),
                                     ),
                                   ),
