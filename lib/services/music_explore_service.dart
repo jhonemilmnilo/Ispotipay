@@ -11,7 +11,7 @@ class MusicExploreService {
 
   int _pageOffset = 0;
 
-  /// Paginated Top Playlists (15 items per batch)
+  /// Paginated, non-repeating Top Playlists (15 items per batch)
   List<Playlist> getTopPlaylists({int offset = 0, int limit = 15}) {
     final allCuratedPlaylists = [
       const Playlist(
@@ -154,13 +154,163 @@ class MusicExploreService {
         thumbnailUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=500&q=80',
         searchQuery: 'Top Anime Openings Hits',
       ),
+      const Playlist(
+        id: 'pl_21',
+        title: 'City Pop Tokyo',
+        description: 'Retro 80s Japanese grooves',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?w=500&q=80',
+        searchQuery: 'Japanese City Pop 80s Hits',
+      ),
+      const Playlist(
+        id: 'pl_22',
+        title: 'Bossa Nova Sunset',
+        description: 'Breezy Brazilian acoustics',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500&q=80',
+        searchQuery: 'Bossa Nova Sunset Vibes',
+      ),
+      const Playlist(
+        id: 'pl_23',
+        title: 'Gaming & Cyberpunk',
+        description: 'Futuristic synth bass & electronic beats',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=500&q=80',
+        searchQuery: 'Cyberpunk Electronic Synth Gaming',
+      ),
+      const Playlist(
+        id: 'pl_24',
+        title: 'Deep House Sunset',
+        description: 'Hypnotic club rhythms',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=500&q=80',
+        searchQuery: 'Deep House Chill Sunset',
+      ),
+      const Playlist(
+        id: 'pl_25',
+        title: 'Lo-Fi Rain & Sleep',
+        description: 'Gentle textures for peaceful slumber',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=500&q=80',
+        searchQuery: 'Lofi Rain Sleep Chill Beats',
+      ),
+      const Playlist(
+        id: 'pl_26',
+        title: 'Latin Fiesta Hits',
+        description: 'Reggaeton & vibrant Latin pop',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&q=80',
+        searchQuery: 'Top Latin Reggaeton Hits',
+      ),
+      const Playlist(
+        id: 'pl_27',
+        title: 'Blues & Soul Classics',
+        description: 'Raw emotion & electric guitars',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=500&q=80',
+        searchQuery: 'Classic Blues and Soul Hits',
+      ),
+      const Playlist(
+        id: 'pl_28',
+        title: 'Roadtrip Rock Anthems',
+        description: 'Classic rock to sing loud in the car',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80',
+        searchQuery: 'Classic Rock Roadtrip Hits',
+      ),
+      const Playlist(
+        id: 'pl_29',
+        title: 'K-Drama Romance OST',
+        description: 'Emotional theme songs from famous dramas',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80',
+        searchQuery: 'Kdrama Romance OST Hits',
+      ),
+      const Playlist(
+        id: 'pl_30',
+        title: 'Neo-Soul Sunday',
+        description: 'Rich chords and velvety vocals',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
+        searchQuery: 'Neo Soul Chill R&B',
+      ),
+      const Playlist(
+        id: 'pl_31',
+        title: 'Acoustic Coffeehouse',
+        description: 'Warm indie acoustic covers',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=500&q=80',
+        searchQuery: 'Acoustic Coffeehouse Indie Covers',
+      ),
+      const Playlist(
+        id: 'pl_32',
+        title: 'Country Sunset',
+        description: 'Heartfelt storytelling and acoustic guitars',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=500&q=80',
+        searchQuery: 'Top Country Music Hits',
+      ),
+      const Playlist(
+        id: 'pl_33',
+        title: 'Trap Nation Wave',
+        description: '808s and modern hip-hop flow',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&q=80',
+        searchQuery: 'Trap Hits Rap Trending',
+      ),
+      const Playlist(
+        id: 'pl_34',
+        title: 'Synthwave & Retrowave',
+        description: 'Neon 80s nostalgia vibes',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=500&q=80',
+        searchQuery: 'Synthwave Retrowave 80s',
+      ),
+      const Playlist(
+        id: 'pl_35',
+        title: 'Piano Peace',
+        description: 'Calming solo piano melodies',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=500&q=80',
+        searchQuery: 'Peaceful Piano Relaxing Hits',
+      ),
+      const Playlist(
+        id: 'pl_36',
+        title: 'Dancehall Reggae',
+        description: 'Energetic Jamaican riddims',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=500&q=80',
+        searchQuery: 'Top Dancehall Reggae Hits',
+      ),
+      const Playlist(
+        id: 'pl_37',
+        title: 'Bollywood Hits',
+        description: 'Energetic Indian cinema chart-toppers',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=500&q=80',
+        searchQuery: 'Top Bollywood Dance Hits',
+      ),
+      const Playlist(
+        id: 'pl_38',
+        title: 'Indie Folk & Wood',
+        description: 'Acoustic harmonies and forest vibes',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=500&q=80',
+        searchQuery: 'Indie Folk Acoustic Anthems',
+      ),
+      const Playlist(
+        id: 'pl_39',
+        title: 'Disco Revival',
+        description: 'Funk basslines and groove',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&q=80',
+        searchQuery: 'Modern Disco Nu Funk Hits',
+      ),
+      const Playlist(
+        id: 'pl_40',
+        title: 'Instrumental Sleep Melodies',
+        description: 'Deep relaxation soundscapes',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=500&q=80',
+        searchQuery: 'Relaxing Instrumental Sleep Music',
+      ),
     ];
 
     if (offset >= allCuratedPlaylists.length) {
-      // Loop with distinct query suffixes so infinite scroll keeps going
-      final loopOffset = offset % allCuratedPlaylists.length;
-      return allCuratedPlaylists.skip(loopOffset).take(limit).toList();
+      // Dynamic generative playlists for endless scrolling without duplicates
+      final pageIndex = (offset - allCuratedPlaylists.length) ~/ limit + 1;
+      return List.generate(limit, (i) {
+        final itemNumber = offset + i + 1;
+        return Playlist(
+          id: 'gen_pl_$itemNumber',
+          title: 'Special Mix Vol. $itemNumber',
+          description: 'Curated mix edition #$pageIndex',
+          thumbnailUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80',
+          searchQuery: 'Hit Music Mix Vol $itemNumber',
+        );
+      });
     }
+
     return allCuratedPlaylists.skip(offset).take(limit).toList();
   }
 

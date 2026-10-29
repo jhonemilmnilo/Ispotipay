@@ -87,7 +87,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     if (mounted) {
       setState(() {
-        _topPlaylists.addAll(newPlaylists);
+        // Enforce strict deduplication so no playlist is ever repeated
+        final existingIds = _topPlaylists.map((p) => p.id).toSet();
+        for (final p in newPlaylists) {
+          if (!existingIds.contains(p.id)) {
+            _topPlaylists.add(p);
+          }
+        }
         _playlistOffset += newPlaylists.length;
         _isLoadingMorePlaylists = false;
       });
