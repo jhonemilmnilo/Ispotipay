@@ -24,6 +24,11 @@ class AudioPlayerService {
   final _currentTrackController = StreamController<Track?>.broadcast();
   Stream<Track?> get currentTrackStream => _currentTrackController.stream;
 
+  final _isPreloadingController = StreamController<bool>.broadcast();
+  Stream<bool> get isPreloadingStream => _isPreloadingController.stream;
+  bool _isPreloading = false;
+  bool get isPreloading => _isPreloading;
+
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
@@ -38,6 +43,11 @@ class AudioPlayerService {
 
   /// Play a track (from local file or remote stream)
   Future<void> playTrack(Track track) async {
+    // 1. Instantly pause/stop previous audio and reset progress
+    await _player.pause();
+    _isPreloading = true;
+    _isPreloadingController.add(true);
+
     _currentTrack = track;
     _currentTrackController.add(_currentTrack);
 
@@ -49,7 +59,7 @@ class AudioPlayerService {
         // Play local offline file
         await _player.setFilePath(track.audioPath!);
       } else {
-        // 1. Resolve online stream URL via exact title, artist, and studio duration
+        // 2. Resolve online stream URL via exact title, artist, and studio duration
         final streamUrl = await _exploreService.getAudioStreamUrl(
           track.id,
           title: track.title,
@@ -63,9 +73,12 @@ class AudioPlayerService {
           throw Exception('Could not resolve audio stream URL');
         }
       }
+      _isPreloading = false;
+      _isPreloadingController.add(false);
       await _player.play();
     } catch (e) {
-      // Print error so user/logs can see exact playback problem
+      _isPreloading = false;
+      _isPreloadingController.add(false);
       debugPrint('[AudioPlayerService] Playback error: $e');
     }
   }
@@ -92,6 +105,7 @@ class AudioPlayerService {
 
   void dispose() {
     _currentTrackController.close();
+    _isPreloadingController.close();
     _player.dispose();
   }
 }
