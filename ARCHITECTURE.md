@@ -22,7 +22,7 @@ flowchart TD
     end
 
     subgraph Local Storage [On-Device Storage]
-        LocalDB[(Local Key-Value / DB\nHive / sqflite)]
+        LocalDB[(Local Relational DB\nSQLite - sqflite)]
         FileStorage[Local Media Directory\nDownloaded Audio & .lrc Files]
     end
 
@@ -77,13 +77,47 @@ flowchart TD
 
 ---
 
-## 4. Local-First Storage Schema
+## 4. Local-First Storage Schema (SQLite)
 
-All private listening data is kept strictly on-device:
+All private listening data is kept strictly on-device using structured SQLite tables:
 
-- **Favorites Box (`favorites`):**
-  - List of Track models (`id`, `title`, `artist`, `albumArtUrl`, `durationMs`).
-- **Recents Box (`recents`):**
-  - LIFO list of played tracks with timestamp (capped at max 100 items to keep DB tiny and fast).
-- **Downloads Box (`downloads`):**
-  - Track models with local file paths: `localAudioPath`, `localLyricsPath`.
+### 1. `favorites` table:
+```sql
+CREATE TABLE favorites (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  artist TEXT NOT NULL,
+  album TEXT,
+  duration_ms INTEGER NOT NULL,
+  thumbnail_url TEXT,
+  created_at INTEGER NOT NULL
+);
+```
+
+### 2. `recents` table (Capped at 100 items via trigger/query):
+```sql
+CREATE TABLE recents (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  artist TEXT NOT NULL,
+  album TEXT,
+  duration_ms INTEGER NOT NULL,
+  thumbnail_url TEXT,
+  played_at INTEGER NOT NULL
+);
+```
+
+### 3. `downloads` table:
+```sql
+CREATE TABLE downloads (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  artist TEXT NOT NULL,
+  album TEXT,
+  duration_ms INTEGER NOT NULL,
+  thumbnail_url TEXT,
+  audio_path TEXT NOT NULL,
+  lyrics_path TEXT,
+  downloaded_at INTEGER NOT NULL
+);
+```
