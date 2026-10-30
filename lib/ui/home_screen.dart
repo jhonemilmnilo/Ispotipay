@@ -32,6 +32,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   final List<Track> _topMusic = [];
   final List<Track> _recommended = [];
   final List<Playlist> _topPlaylists = [];
+  final List<Playlist> _artistAlbums = [];
   List<Track> _recents = [];
   List<Track> _favorites = [];
   List<Track> _mostPlayed = [];
@@ -197,6 +198,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final recommended = await _exploreService.getRecommendedTracks(limit: 20);
     final all = await _exploreService.fetchNextAllMusicBatch(batchSize: 25);
     final playlists = _exploreService.getTopPlaylists(offset: 0, limit: 15);
+    final artistAlbums = _exploreService.getArtistAlbums();
 
     if (mounted) {
       setState(() {
@@ -212,6 +214,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _topPlaylists.addAll(playlists);
         _playlistOffset = playlists.length;
         _isLoadingPlaylists = false;
+
+        _artistAlbums.clear();
+        _artistAlbums.addAll(artistAlbums);
 
         // Strictly preserve and append initial All Music
         _allMusic.clear();
@@ -400,6 +405,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
                 SliverToBoxAdapter(
                   child: _buildPlaylistsCarousel(),
+                ),
+              ],
+
+              // Featured Artist Albums & Discographies (Horizontal Carousel)
+              if (_artistAlbums.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: _buildSectionHeader('Artist Spotlights & Albums', icon: Icons.album_rounded),
+                ),
+                SliverToBoxAdapter(
+                  child: _buildArtistAlbumsCarousel(),
                 ),
               ],
 
@@ -861,6 +876,106 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   const SizedBox(height: 2),
                   Text(
                     playlist.description,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildArtistAlbumsCarousel() {
+    return SizedBox(
+      height: 195,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: _artistAlbums.length,
+        itemBuilder: (context, index) {
+          final album = _artistAlbums[index];
+          return GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => PlaylistScreen(playlist: album)),
+              ).then((_) {
+                _loadLocalLibrary();
+              });
+            },
+            child: Container(
+              width: 140,
+              margin: const EdgeInsets.symmetric(horizontal: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    alignment: Alignment.bottomRight,
+                    children: [
+                      AspectRatio(
+                        aspectRatio: 1,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: album.thumbnailUrl != null
+                              ? Image.network(
+                                  album.thumbnailUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => _buildFallbackThumbnail(),
+                                )
+                              : _buildFallbackThumbnail(),
+                        ),
+                      ),
+                      Container(
+                        margin: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.75),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: AppTheme.accentLime.withValues(alpha: 0.4),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.album, size: 10, color: AppTheme.accentLime),
+                            SizedBox(width: 3),
+                            Text(
+                              'ALBUM',
+                              style: TextStyle(
+                                color: AppTheme.accentLime,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    album.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    album.description,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

@@ -316,6 +316,96 @@ class MusicExploreService {
     return allCuratedPlaylists.skip(offset).take(limit).toList();
   }
 
+  /// Curated Artist Albums & Spotlights (One artist per album collection)
+  List<Playlist> getArtistAlbums() {
+    return const [
+      Playlist(
+        id: 'album_taylor_swift',
+        title: 'Taylor Swift: The Eras Collection',
+        description: 'Complete studio anthology & greatest hits',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=500&q=80',
+        searchQuery: 'Taylor Swift',
+      ),
+      Playlist(
+        id: 'album_the_weeknd',
+        title: 'The Weeknd: After Hours & Highlights',
+        description: 'Atmospheric R&B, pop anthems & synth vibes',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1509114397022-ed747cca3f65?w=500&q=80',
+        searchQuery: 'The Weeknd',
+      ),
+      Playlist(
+        id: 'album_maki',
+        title: 'Maki: OPM Breakthrough',
+        description: 'Dilaw, Namumula, Kahit Kailan & solo hits',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=500&q=80',
+        searchQuery: 'Maki',
+      ),
+      Playlist(
+        id: 'album_bruno_mars',
+        title: 'Bruno Mars: 24K Magic & Classics',
+        description: 'Funk grooves, smooth ballads & pop soul',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=500&q=80',
+        searchQuery: 'Bruno Mars',
+      ),
+      Playlist(
+        id: 'album_billie_eilish',
+        title: 'Billie Eilish: Hit Me Hard & Soft',
+        description: 'Hypnotic dark pop & intimate melodies',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+        searchQuery: 'Billie Eilish',
+      ),
+      Playlist(
+        id: 'album_olivia_rodrigo',
+        title: 'Olivia Rodrigo: GUTS & SOUR',
+        description: 'Raw teen angst, pop-rock & piano ballads',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1465847899084-d164df4dedc6?w=500&q=80',
+        searchQuery: 'Olivia Rodrigo',
+      ),
+      Playlist(
+        id: 'album_dilaw',
+        title: 'Dilaw: Sansinukob & Rock Anthems',
+        description: 'Uhaw, Orasa, 3019 & expressive indie rock',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1498038432885-c6f3f1b912ee?w=500&q=80',
+        searchQuery: 'Dilaw',
+      ),
+      Playlist(
+        id: 'album_ariana_grande',
+        title: 'Ariana Grande: Eternal Sunshine',
+        description: 'Powerhouse vocals, sweet trap-pop & R&B',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=500&q=80',
+        searchQuery: 'Ariana Grande',
+      ),
+      Playlist(
+        id: 'album_ed_sheeran',
+        title: 'Ed Sheeran: Mathematics & Acoustics',
+        description: 'Loop pedal anthems & emotional love songs',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1510915361894-db8b60106cb1?w=500&q=80',
+        searchQuery: 'Ed Sheeran',
+      ),
+      Playlist(
+        id: 'album_post_malone',
+        title: 'Post Malone: Austin & Greatest Hits',
+        description: 'Melodic rap, pop fusion & acoustic grit',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=500&q=80',
+        searchQuery: 'Post Malone',
+      ),
+      Playlist(
+        id: 'album_sza',
+        title: 'SZA: SOS & Deluxe Classics',
+        description: 'Introspective R&B, silky melodies & honest storytelling',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1518609878373-06d740f60d8b?w=500&q=80',
+        searchQuery: 'SZA',
+      ),
+      Playlist(
+        id: 'album_cup_of_joe',
+        title: 'Cup of Joe: Patutunguhan',
+        description: 'Tingin, Estranghero & heartfelt Baguio indie pop',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1511192336575-5a79af67a629?w=500&q=80',
+        searchQuery: 'Cup of Joe',
+      ),
+    ];
+  }
+
   /// Search real studio tracks via iTunes Search API (clean metadata, no video compilations)
   Future<List<Track>> searchTracks(String query, {int limit = 25}) async {
     if (query.trim().isEmpty) return [];
