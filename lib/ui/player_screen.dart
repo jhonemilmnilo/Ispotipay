@@ -19,7 +19,8 @@ class PlayerScreen extends StatefulWidget {
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderStateMixin {
+class _PlayerScreenState extends State<PlayerScreen>
+    with SingleTickerProviderStateMixin {
   final AudioPlayerService _audioService = AudioPlayerService();
   final LyricsService _lyricsService = LyricsService();
   final MusicExploreService _exploreService = MusicExploreService();
@@ -230,7 +231,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         CircularProgressIndicator(
                           value: progress,
                           strokeWidth: 2.8,
-                          backgroundColor: AppTheme.surfaceLight.withValues(alpha: 0.3),
+                          backgroundColor: AppTheme.surfaceLight.withValues(
+                            alpha: 0.3,
+                          ),
                           color: AppTheme.accentLime,
                         ),
                         ClipRRect(
@@ -241,19 +244,22 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                   width: 42,
                                   height: 42,
                                   fit: BoxFit.cover,
-                                  frameBuilder: (context, child, frame, wasSync) {
-                                    if (wasSync || frame != null) return child;
-                                    return _buildCustomThumbnail(
-                                      title: track.title,
-                                      artist: track.artist,
-                                      size: 42,
-                                    );
-                                  },
-                                  errorBuilder: (_, _, _) => _buildCustomThumbnail(
-                                    title: track.title,
-                                    artist: track.artist,
-                                    size: 42,
-                                  ),
+                                  frameBuilder:
+                                      (context, child, frame, wasSync) {
+                                        if (wasSync || frame != null)
+                                          return child;
+                                        return _buildCustomThumbnail(
+                                          title: track.title,
+                                          artist: track.artist,
+                                          size: 42,
+                                        );
+                                      },
+                                  errorBuilder: (_, _, _) =>
+                                      _buildCustomThumbnail(
+                                        title: track.title,
+                                        artist: track.artist,
+                                        size: 42,
+                                      ),
                                 )
                               : _buildCustomThumbnail(
                                   title: track.title,
@@ -271,7 +277,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       children: [
                         Row(
                           children: const [
-                            Icon(Icons.graphic_eq, color: AppTheme.accentLime, size: 14),
+                            Icon(
+                              Icons.graphic_eq,
+                              color: AppTheme.accentLime,
+                              size: 14,
+                            ),
                             SizedBox(width: 4),
                             Text(
                               'PLAYING NOW',
@@ -402,9 +412,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: isHistory
-              ? AppTheme.textSecondary
-              : AppTheme.textPrimary,
+          color: isHistory ? AppTheme.textSecondary : AppTheme.textPrimary,
           fontSize: 14,
           fontWeight: isHistory ? FontWeight.normal : FontWeight.w500,
         ),
@@ -502,7 +510,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         return Container(
                           decoration: const BoxDecoration(
                             color: Color(0xFF0A0F1D),
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(24),
+                            ),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black87,
@@ -520,7 +530,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                   width: 44,
                                   height: 4.5,
                                   decoration: BoxDecoration(
-                                    color: AppTheme.textSecondary.withValues(alpha: 0.35),
+                                    color: AppTheme.textSecondary.withValues(
+                                      alpha: 0.35,
+                                    ),
                                     borderRadius: BorderRadius.circular(3),
                                   ),
                                 ),
@@ -529,12 +541,16 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
                               // Drawer Header
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                ),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         const Text(
                                           'Up Next',
@@ -555,9 +571,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                       ],
                                     ),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: AppTheme.accentLime.withValues(alpha: 0.15),
+                                        color: AppTheme.accentLime.withValues(
+                                          alpha: 0.15,
+                                        ),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
@@ -572,42 +593,60 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                   ],
                                 ),
                               ),
-                              const Divider(color: AppTheme.divider, height: 24),
+                              const Divider(
+                                color: AppTheme.divider,
+                                height: 24,
+                              ),
 
                               // Unified Timeline Queue List: [Previous/History, Currently Playing, Upcoming Next with Drag & Drop]
                               Expanded(
                                 child: _isLoadingUpNext
                                     ? _buildUpNextShimmerList()
                                     : NotificationListener<ScrollNotification>(
-                                        onNotification: (ScrollNotification scrollInfo) {
-                                          if (scrollInfo.metrics.pixels >=
-                                              scrollInfo.metrics.maxScrollExtent - 200) {
-                                            _loadMoreUpNext();
-                                          }
-                                          return false;
-                                        },
+                                        onNotification:
+                                            (ScrollNotification scrollInfo) {
+                                              if (scrollInfo.metrics.pixels >=
+                                                  scrollInfo
+                                                          .metrics
+                                                          .maxScrollExtent -
+                                                      200) {
+                                                _loadMoreUpNext();
+                                              }
+                                              return false;
+                                            },
                                         child: ListView(
                                           controller: scrollController,
                                           physics: const BouncingScrollPhysics(
-                                            parent: AlwaysScrollableScrollPhysics(),
+                                            parent:
+                                                AlwaysScrollableScrollPhysics(),
                                           ),
                                           children: [
                                             // 1. Finished History Items (at the top, strict unique IDs)
                                             Builder(
                                               builder: (context) {
-                                                final renderedHistoryIds = <String>{};
+                                                final renderedHistoryIds =
+                                                    <String>{};
                                                 final uniqueHistory = <Track>[];
                                                 for (final h in liveHistory) {
-                                                  if (h.id != liveCurrent?.id && !renderedHistoryIds.contains(h.id)) {
-                                                    renderedHistoryIds.add(h.id);
+                                                  if (h.id != liveCurrent?.id &&
+                                                      !renderedHistoryIds
+                                                          .contains(h.id)) {
+                                                    renderedHistoryIds.add(
+                                                      h.id,
+                                                    );
                                                     uniqueHistory.add(h);
                                                   }
                                                 }
 
                                                 return Column(
-                                                  mainAxisSize: MainAxisSize.min,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
                                                   children: [
-                                                    for (int i = 0; i < uniqueHistory.length; i++)
+                                                    for (
+                                                      int i = 0;
+                                                      i < uniqueHistory.length;
+                                                      i++
+                                                    )
                                                       _buildUnifiedQueueItem(
                                                         ctx: ctx,
                                                         track: uniqueHistory[i],
@@ -624,44 +663,72 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                             Builder(
                                               builder: (context) {
                                                 final activeList = <Track>[];
-                                                if (liveCurrent != null) activeList.add(liveCurrent);
+                                                if (liveCurrent != null)
+                                                  activeList.add(liveCurrent);
 
                                                 // Exclude history items and currently playing track from upcoming queue to guarantee no duplicates
-                                                final historyIdSet = liveHistory.map((t) => t.id).toSet();
+                                                final historyIdSet = liveHistory
+                                                    .map((t) => t.id)
+                                                    .toSet();
                                                 final seenQueueIds = <String>{};
-                                                if (liveCurrent != null) seenQueueIds.add(liveCurrent.id);
+                                                if (liveCurrent != null)
+                                                  seenQueueIds.add(
+                                                    liveCurrent.id,
+                                                  );
 
                                                 for (final t in liveQueue) {
-                                                  if (!historyIdSet.contains(t.id) && !seenQueueIds.contains(t.id)) {
+                                                  if (!historyIdSet.contains(
+                                                        t.id,
+                                                      ) &&
+                                                      !seenQueueIds.contains(
+                                                        t.id,
+                                                      )) {
                                                     seenQueueIds.add(t.id);
                                                     activeList.add(t);
                                                   }
                                                 }
 
-                                                if (activeList.isEmpty) return const SizedBox.shrink();
+                                                if (activeList.isEmpty)
+                                                  return const SizedBox.shrink();
 
                                                 return ReorderableListView.builder(
                                                   shrinkWrap: true,
-                                                  physics: const NeverScrollableScrollPhysics(),
-                                                  buildDefaultDragHandles: false,
+                                                  physics:
+                                                      const NeverScrollableScrollPhysics(),
+                                                  buildDefaultDragHandles:
+                                                      false,
                                                   itemCount: activeList.length,
                                                   onReorderItem: (oldIdx, newIdx) {
-                                                    _audioService.reorderActiveTimeline(oldIdx, newIdx);
+                                                    _audioService
+                                                        .reorderActiveTimeline(
+                                                          oldIdx,
+                                                          newIdx,
+                                                        );
                                                   },
                                                   itemBuilder: (context, activeIdx) {
-                                                    final track = activeList[activeIdx];
-                                                    final isCurrent = track.id == liveCurrent?.id;
-                                                    final overallIndex = liveHistory.length + activeIdx;
+                                                    final track =
+                                                        activeList[activeIdx];
+                                                    final isCurrent =
+                                                        track.id ==
+                                                        liveCurrent?.id;
+                                                    final overallIndex =
+                                                        liveHistory.length +
+                                                        activeIdx;
 
                                                     return Container(
-                                                      key: ValueKey('active_${track.id}_$activeIdx'),
-                                                      child: _buildUnifiedQueueItem(
-                                                        ctx: ctx,
-                                                        track: track,
-                                                        isPlaying: isCurrent,
-                                                        isHistory: false,
-                                                        listIndex: overallIndex,
+                                                      key: ValueKey(
+                                                        'active_${track.id}_$activeIdx',
                                                       ),
+                                                      child:
+                                                          _buildUnifiedQueueItem(
+                                                            ctx: ctx,
+                                                            track: track,
+                                                            isPlaying:
+                                                                isCurrent,
+                                                            isHistory: false,
+                                                            listIndex:
+                                                                overallIndex,
+                                                          ),
                                                     );
                                                   },
                                                 );
@@ -678,11 +745,16 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                                 liveCurrent == null &&
                                                 liveQueue.isEmpty)
                                               const Padding(
-                                                padding: EdgeInsets.symmetric(vertical: 40),
+                                                padding: EdgeInsets.symmetric(
+                                                  vertical: 40,
+                                                ),
                                                 child: Center(
                                                   child: Text(
                                                     'Queue is empty',
-                                                    style: TextStyle(color: AppTheme.textSecondary),
+                                                    style: TextStyle(
+                                                      color: AppTheme
+                                                          .textSecondary,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
@@ -792,7 +864,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.textPrimary, size: 30),
+          icon: const Icon(
+            Icons.keyboard_arrow_down,
+            color: AppTheme.textPrimary,
+            size: 30,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Column(
@@ -845,7 +921,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         : AppTheme.textPrimary,
                     size: 22,
                   ),
-            tooltip: (_activeTrack?.isDownloaded ?? false) ? 'Downloaded' : 'Download for offline',
+            tooltip: (_activeTrack?.isDownloaded ?? false)
+                ? 'Downloaded'
+                : 'Download for offline',
             onPressed: _handleDownload,
           ),
           // Up Next / Queue Drawer Button
@@ -910,8 +988,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         child: StreamBuilder<Duration>(
                           stream: _audioService.positionStream,
                           builder: (context, snapshot) {
-                            final currentPosition = snapshot.data ?? Duration.zero;
-                            final activeIndex = _findActiveLineIndex(currentPosition);
+                            final currentPosition =
+                                snapshot.data ?? Duration.zero;
+                            final activeIndex = _findActiveLineIndex(
+                              currentPosition,
+                            );
 
                             final targetOffset = (activeIndex * slotHeight);
 
@@ -920,12 +1001,17 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 AnimatedPositioned(
                                   duration: const Duration(milliseconds: 350),
                                   curve: Curves.easeOutCubic,
-                                  top: halfHeight - (slotHeight / 2) - targetOffset,
+                                  top:
+                                      halfHeight -
+                                      (slotHeight / 2) -
+                                      targetOffset,
                                   left: 0,
                                   right: 0,
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
-                                    children: List.generate(_lyrics.length, (index) {
+                                    children: List.generate(_lyrics.length, (
+                                      index,
+                                    ) {
                                       final line = _lyrics[index];
                                       final isCurrent = index == activeIndex;
 
@@ -934,28 +1020,44 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                         child: Center(
                                           child: GestureDetector(
                                             onTap: () {
-                                              if (line.timestamp > Duration.zero) {
-                                                _audioService.seek(line.timestamp);
+                                              if (line.timestamp >
+                                                  Duration.zero) {
+                                                _audioService.seek(
+                                                  line.timestamp,
+                                                );
                                               }
                                             },
                                             child: Padding(
-                                              padding: const EdgeInsets.symmetric(horizontal: 32),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 32,
+                                                  ),
                                               child: AnimatedDefaultTextStyle(
-                                                duration: const Duration(milliseconds: 250),
+                                                duration: const Duration(
+                                                  milliseconds: 250,
+                                                ),
                                                 curve: Curves.easeOut,
                                                 textAlign: TextAlign.center,
                                                 style: TextStyle(
                                                   color: isCurrent
                                                       ? AppTheme.accentLime
-                                                      : AppTheme.textSecondary.withValues(alpha: 0.25),
+                                                      : AppTheme.textSecondary
+                                                            .withValues(
+                                                              alpha: 0.25,
+                                                            ),
                                                   fontSize: isCurrent ? 22 : 16,
-                                                  fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+                                                  fontWeight: isCurrent
+                                                      ? FontWeight.bold
+                                                      : FontWeight.w500,
                                                   letterSpacing: -0.3,
                                                 ),
                                                 child: Text(
-                                                  line.text.isEmpty ? '♪' : line.text,
+                                                  line.text.isEmpty
+                                                      ? '♪'
+                                                      : line.text,
                                                   maxLines: 2,
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
                                               ),
                                             ),
@@ -993,7 +1095,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                     children: [
                       // Track Info & Favorite Heart Toggle Row (Above Progress Bar)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 4,
+                        ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -1028,19 +1133,29 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             ),
                             IconButton(
                               icon: Icon(
-                                _isFavorite ? Icons.favorite : Icons.favorite_border,
-                                color: _isFavorite ? Colors.redAccent : AppTheme.textPrimary,
+                                _isFavorite
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: _isFavorite
+                                    ? Colors.redAccent
+                                    : AppTheme.textPrimary,
                                 size: 26,
                               ),
-                              tooltip: _isFavorite ? 'In Favorites' : 'Add to Favorites',
+                              tooltip: _isFavorite
+                                  ? 'In Favorites'
+                                  : 'Add to Favorites',
                               onPressed: () async {
                                 if (_activeTrack != null) {
-                                  final isFav = await _dbService.toggleFavorite(_activeTrack!);
+                                  final isFav = await _dbService.toggleFavorite(
+                                    _activeTrack!,
+                                  );
                                   if (!context.mounted) return;
                                   setState(() {
                                     _isFavorite = isFav;
                                   });
-                                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                  ScaffoldMessenger.of(
+                                    context,
+                                  ).hideCurrentSnackBar();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -1066,8 +1181,12 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             stream: _audioService.durationStream,
                             builder: (context, durSnap) {
                               final dur = durSnap.data ?? Duration.zero;
-                              final double maxSec = dur.inSeconds > 0 ? dur.inSeconds.toDouble() : 1.0;
-                              final double currentSec = pos.inSeconds.toDouble().clamp(0.0, maxSec);
+                              final double maxSec = dur.inSeconds > 0
+                                  ? dur.inSeconds.toDouble()
+                                  : 1.0;
+                              final double currentSec = pos.inSeconds
+                                  .toDouble()
+                                  .clamp(0.0, maxSec);
 
                               return Column(
                                 children: [
@@ -1077,21 +1196,28 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                       inactiveTrackColor: AppTheme.surfaceLight,
                                       thumbColor: AppTheme.accentLime,
                                       trackHeight: 3,
-                                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                      thumbShape: const RoundSliderThumbShape(
+                                        enabledThumbRadius: 6,
+                                      ),
                                     ),
                                     child: Slider(
                                       value: currentSec,
                                       min: 0.0,
                                       max: maxSec,
                                       onChanged: (val) {
-                                        _audioService.seek(Duration(seconds: val.toInt()));
+                                        _audioService.seek(
+                                          Duration(seconds: val.toInt()),
+                                        );
                                       },
                                     ),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         Text(
                                           _formatDuration(pos),
@@ -1131,13 +1257,19 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                   Icons.shuffle_rounded,
                                   color: isShuffle
                                       ? AppTheme.accentLime
-                                      : AppTheme.textSecondary.withValues(alpha: 0.6),
+                                      : AppTheme.textSecondary.withValues(
+                                          alpha: 0.6,
+                                        ),
                                   size: 24,
                                 ),
-                                tooltip: isShuffle ? 'Shuffle: On' : 'Shuffle: Off',
+                                tooltip: isShuffle
+                                    ? 'Shuffle: On'
+                                    : 'Shuffle: Off',
                                 onPressed: () {
                                   _audioService.toggleShuffle();
-                                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                  ScaffoldMessenger.of(
+                                    context,
+                                  ).hideCurrentSnackBar();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -1178,7 +1310,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                   height: 64,
                                   child: Padding(
                                     padding: EdgeInsets.all(14.0),
-                                    child: CircularProgressIndicator(color: AppTheme.accentLime),
+                                    child: CircularProgressIndicator(
+                                      color: AppTheme.accentLime,
+                                    ),
                                   ),
                                 );
                               }
@@ -1191,7 +1325,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                       : Icons.play_circle_filled,
                                   color: AppTheme.accentLime,
                                 ),
-                                onPressed: () => _audioService.togglePlayPause(),
+                                onPressed: () =>
+                                    _audioService.togglePlayPause(),
                               );
                             },
                           ),
@@ -1214,7 +1349,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             builder: (context, loopSnap) {
                               final mode = loopSnap.data ?? LoopModeType.off;
                               IconData iconData;
-                              Color iconColor = AppTheme.textSecondary.withValues(alpha: 0.6);
+                              Color iconColor = AppTheme.textSecondary
+                                  .withValues(alpha: 0.6);
                               String label;
 
                               switch (mode) {
@@ -1258,13 +1394,16 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                       msg = 'Repeat ALL enabled';
                                       break;
                                     case LoopModeType.playOnce:
-                                      msg = 'Play ONCE enabled • Music stops after track';
+                                      msg =
+                                          'Play ONCE enabled • Music stops after track';
                                       break;
                                     case LoopModeType.off:
                                       msg = 'Repeat OFF • Autoplay active';
                                       break;
                                   }
-                                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                  ScaffoldMessenger.of(
+                                    context,
+                                  ).hideCurrentSnackBar();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(msg),
@@ -1292,7 +1431,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return AnimatedBuilder(
       animation: _shimmerController,
       builder: (context, child) {
-        final opacity = 0.15 + (0.25 * (0.5 - (_shimmerController.value - 0.5).abs()));
+        final opacity =
+            0.15 + (0.25 * (0.5 - (_shimmerController.value - 0.5).abs()));
         return Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1301,7 +1441,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 width: 140,
                 height: 18,
                 decoration: BoxDecoration(
-                  color: AppTheme.textSecondary.withValues(alpha: opacity * 0.5),
+                  color: AppTheme.textSecondary.withValues(
+                    alpha: opacity * 0.5,
+                  ),
                   borderRadius: BorderRadius.circular(6),
                 ),
               ),
@@ -1319,7 +1461,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                 width: 180,
                 height: 18,
                 decoration: BoxDecoration(
-                  color: AppTheme.textSecondary.withValues(alpha: opacity * 0.5),
+                  color: AppTheme.textSecondary.withValues(
+                    alpha: opacity * 0.5,
+                  ),
                   borderRadius: BorderRadius.circular(6),
                 ),
               ),
@@ -1339,7 +1483,11 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     final int charCode = title.isNotEmpty ? title.codeUnitAt(0) : 65;
     final List<Color> gradientColors = [
       const Color(0xFF1558C9),
-      Color.lerp(const Color(0xFF030407), const Color(0xFF1558C9), (charCode % 5) / 10)!,
+      Color.lerp(
+        const Color(0xFF030407),
+        const Color(0xFF1558C9),
+        (charCode % 5) / 10,
+      )!,
       const Color(0xFF0A0F1D),
     ];
 
@@ -1407,7 +1555,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return AnimatedBuilder(
       animation: _shimmerController,
       builder: (context, child) {
-        final opacity = 0.12 + (0.18 * (0.5 - (_shimmerController.value - 0.5).abs()));
+        final opacity =
+            0.12 + (0.18 * (0.5 - (_shimmerController.value - 0.5).abs()));
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
@@ -1438,7 +1587,9 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       width: 130,
                       height: 10,
                       decoration: BoxDecoration(
-                        color: AppTheme.surfaceLight.withValues(alpha: opacity * 0.7),
+                        color: AppTheme.surfaceLight.withValues(
+                          alpha: opacity * 0.7,
+                        ),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -1469,8 +1620,14 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: const [
-              Text('00:00', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
-              Text('--:--', style: TextStyle(color: AppTheme.textSecondary, fontSize: 11)),
+              Text(
+                '00:00',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+              ),
+              Text(
+                '--:--',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+              ),
             ],
           ),
         ),
@@ -1480,7 +1637,10 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           height: 56,
           child: Padding(
             padding: EdgeInsets.all(12.0),
-            child: CircularProgressIndicator(color: AppTheme.accentLime, strokeWidth: 3),
+            child: CircularProgressIndicator(
+              color: AppTheme.accentLime,
+              strokeWidth: 3,
+            ),
           ),
         ),
       ],
