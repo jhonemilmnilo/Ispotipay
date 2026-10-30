@@ -23,6 +23,19 @@ class IspotipayApp extends StatelessWidget {
       title: 'IsPoTiPay',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
+      builder: (context, child) {
+        // Enforce safe text scaling across all devices to prevent accessibility overflow
+        final mediaQuery = MediaQuery.of(context);
+        return MediaQuery(
+          data: mediaQuery.copyWith(
+            textScaler: mediaQuery.textScaler.clamp(
+              minScaleFactor: 0.85,
+              maxScaleFactor: 1.15,
+            ),
+          ),
+          child: child ?? const SizedBox(),
+        );
+      },
       home: const HomeScreen(),
     );
   }

@@ -456,7 +456,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
                 SliverToBoxAdapter(
                   child: SizedBox(
-                    height: 165,
+                    height: 190,
                     child: ListView.separated(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       scrollDirection: Axis.horizontal,
@@ -490,6 +490,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Stack(
                                   children: [
@@ -546,27 +547,34 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  album.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: AppTheme.textPrimary,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  album.description,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: AppTheme.textSecondary,
-                                    fontSize: 10,
+                                const SizedBox(height: 6),
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        album.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: AppTheme.textPrimary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        album.description,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(
+                                          color: AppTheme.textSecondary,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -627,7 +635,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     tracks: _recommended,
                     isLoading: _isLoadingRecommended,
                     cardWidth: 145,
-                    cardHeight: 195,
+                    cardHeight: 215,
                   ),
                 ),
               ],
@@ -642,7 +650,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     tracks: _recents,
                     isLoading: false,
                     cardWidth: 140,
-                    cardHeight: 180,
+                    cardHeight: 205,
                   ),
                 ),
               ],
@@ -657,7 +665,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     tracks: _favorites,
                     isLoading: false,
                     cardWidth: 140,
-                    cardHeight: 180,
+                    cardHeight: 205,
                   ),
                 ),
               ],
@@ -672,7 +680,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     tracks: _mostPlayed,
                     isLoading: false,
                     cardWidth: 130,
-                    cardHeight: 180,
+                    cardHeight: 205,
                     showPlayCount: true,
                   ),
                 ),
@@ -890,6 +898,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               margin: const EdgeInsets.symmetric(horizontal: 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   AspectRatio(
                     aspectRatio: 1,
@@ -919,7 +928,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     track.title,
                     maxLines: 1,
@@ -968,7 +977,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildTopMusicCarousel() {
     if (_isLoadingTop) {
       return SizedBox(
-        height: 200,
+        height: 220,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -980,7 +989,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     if (_topMusic.isEmpty) {
       return const SizedBox(
-        height: 200,
+        height: 220,
         child: Center(
           child: Text(
             'No top music found',
@@ -991,7 +1000,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
 
     return SizedBox(
-      height: 200,
+      height: 220,
       child: ListView.builder(
         controller: _topMusicScrollController,
         scrollDirection: Axis.horizontal,
@@ -1025,6 +1034,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               margin: const EdgeInsets.symmetric(horizontal: 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   AspectRatio(
                     aspectRatio: 1,
@@ -1054,7 +1064,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     track.title,
                     maxLines: 1,
@@ -1087,7 +1097,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _buildPlaylistsCarousel() {
     if (_isLoadingPlaylists) {
       return SizedBox(
-        height: 180,
+        height: 205,
         child: ListView.builder(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1098,7 +1108,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
 
     return SizedBox(
-      height: 180,
+      height: 205,
       child: ListView.builder(
         controller: _playlistScrollController,
         scrollDirection: Axis.horizontal,
@@ -1134,6 +1144,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               margin: const EdgeInsets.symmetric(horizontal: 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   AspectRatio(
                     aspectRatio: 1,
@@ -1150,7 +1161,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           : _buildFallbackThumbnail(),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     playlist.title,
                     maxLines: 1,
@@ -1182,7 +1193,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildArtistAlbumsCarousel() {
     return SizedBox(
-      height: 195,
+      height: 215,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1203,6 +1214,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               margin: const EdgeInsets.symmetric(horizontal: 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Stack(
                     alignment: Alignment.bottomRight,
@@ -1250,7 +1262,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     album.title,
                     maxLines: 1,
