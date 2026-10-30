@@ -947,6 +947,39 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             onPressed: () => _showUpNextDrawer(context),
                           ),
 
+                          // Shuffle Toggle Button
+                          StreamBuilder<bool>(
+                            stream: _audioService.isShuffleStream,
+                            initialData: _audioService.isShuffle,
+                            builder: (context, shuffleSnap) {
+                              final isShuffle = shuffleSnap.data ?? false;
+                              return IconButton(
+                                icon: Icon(
+                                  Icons.shuffle_rounded,
+                                  color: isShuffle
+                                      ? AppTheme.accentLime
+                                      : AppTheme.textSecondary.withValues(alpha: 0.6),
+                                  size: 22,
+                                ),
+                                tooltip: isShuffle ? 'Shuffle: On' : 'Shuffle: Off',
+                                onPressed: () {
+                                  _audioService.toggleShuffle();
+                                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        !isShuffle
+                                            ? 'Shuffle ON • Up Next randomized'
+                                            : 'Shuffle OFF • Queue preserved',
+                                      ),
+                                      duration: const Duration(seconds: 1),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+
                           // Center Cluster: Previous, Play/Pause, Next
                           Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1007,6 +1040,75 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 onPressed: () => _audioService.playNext(),
                               ),
                             ],
+                          ),
+
+                          // Repeat Mode Toggle Button
+                          StreamBuilder<LoopModeType>(
+                            stream: _audioService.loopModeStream,
+                            initialData: _audioService.loopMode,
+                            builder: (context, loopSnap) {
+                              final mode = loopSnap.data ?? LoopModeType.off;
+                              IconData iconData;
+                              Color iconColor = AppTheme.textSecondary.withValues(alpha: 0.6);
+                              String label;
+
+                              switch (mode) {
+                                case LoopModeType.repeatOne:
+                                  iconData = Icons.repeat_one_rounded;
+                                  iconColor = AppTheme.accentLime;
+                                  label = 'Repeat One';
+                                  break;
+                                case LoopModeType.repeatAll:
+                                  iconData = Icons.repeat_rounded;
+                                  iconColor = AppTheme.accentLime;
+                                  label = 'Repeat All';
+                                  break;
+                                case LoopModeType.playOnce:
+                                  iconData = Icons.motion_photos_off_rounded;
+                                  iconColor = AppTheme.accentLime;
+                                  label = 'Play Once (Stop after track)';
+                                  break;
+                                case LoopModeType.off:
+                                  iconData = Icons.repeat_rounded;
+                                  label = 'Repeat Off (Auto-continue)';
+                                  break;
+                              }
+
+                              return IconButton(
+                                icon: Icon(
+                                  iconData,
+                                  color: iconColor,
+                                  size: 22,
+                                ),
+                                tooltip: label,
+                                onPressed: () {
+                                  _audioService.cycleLoopMode();
+                                  final nextMode = _audioService.loopMode;
+                                  String msg;
+                                  switch (nextMode) {
+                                    case LoopModeType.repeatOne:
+                                      msg = 'Repeat ONE enabled';
+                                      break;
+                                    case LoopModeType.repeatAll:
+                                      msg = 'Repeat ALL enabled';
+                                      break;
+                                    case LoopModeType.playOnce:
+                                      msg = 'Play ONCE enabled • Music stops after track';
+                                      break;
+                                    case LoopModeType.off:
+                                      msg = 'Repeat OFF • Autoplay active';
+                                      break;
+                                  }
+                                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(msg),
+                                      duration: const Duration(seconds: 1),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
                           ),
 
                           // Right: Favorite Heart Toggle

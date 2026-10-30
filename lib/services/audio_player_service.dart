@@ -5,6 +5,13 @@ import '../models/track.dart';
 import 'database_service.dart';
 import 'music_explore_service.dart';
 
+enum LoopModeType {
+  off,
+  repeatOne,
+  repeatAll,
+  playOnce,
+}
+
 class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
   factory AudioPlayerService() => _instance;
@@ -32,6 +39,17 @@ class AudioPlayerService {
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
+
+  // Loop & Shuffle State
+  LoopModeType _loopMode = LoopModeType.off;
+  LoopModeType get loopMode => _loopMode;
+  final _loopModeController = StreamController<LoopModeType>.broadcast();
+  Stream<LoopModeType> get loopModeStream => _loopModeController.stream;
+
+  bool _isShuffle = false;
+  bool get isShuffle => _isShuffle;
+  final _isShuffleController = StreamController<bool>.broadcast();
+  Stream<bool> get isShuffleStream => _isShuffleController.stream;
 
   // Queue Management (Strict Sequential Queue & Endless Radio)
   final List<Track> _queue = [];
@@ -61,10 +79,73 @@ class AudioPlayerService {
   void _initListeners() {
     _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
-        // Continuous Non-Stop Autoplay
-        playNext();
+        _handleTrackCompleted();
       }
     });
+  }
+
+  Future<void> _handleTrackCompleted() async {
+    switch (_loopMode) {
+      case LoopModeType.repeatOne:
+        await seek(Duration.zero);
+        await play();
+        break;
+      case LoopModeType.playOnce:
+        await pause();
+        await seek(Duration.zero);
+        break;
+      case LoopModeType.repeatAll:
+        if (_queue.isNotEmpty) {
+          await playNext();
+        } else if (_playbackHistory.isNotEmpty) {
+          // Wrap all history back into queue and play first
+          final loopedQueue = List<Track>.from(_playbackHistory);
+          if (_currentTrack != null) loopedQueue.add(_currentTrack!);
+          _playbackHistory.clear();
+          _historyController.add(_playbackHistory);
+          setQueue(loopedQueue);
+          await playNext();
+        } else if (_currentTrack != null) {
+          await seek(Duration.zero);
+          await play();
+        }
+        break;
+      case LoopModeType.off:
+        // Continuous Non-Stop Autoplay
+        await playNext();
+        break;
+    }
+  }
+
+  /// Toggle shuffle on / off. When activated, shuffles the upcoming Up Next tracks!
+  void toggleShuffle() {
+    _isShuffle = !_isShuffle;
+    _isShuffleController.add(_isShuffle);
+
+    if (_isShuffle && _queue.isNotEmpty) {
+      _queue.shuffle();
+      _queueController.add(_queue);
+      _prefetchUpcomingUrls();
+    }
+  }
+
+  /// Cycle through Repeat modes: off -> repeatOne -> repeatAll -> playOnce -> off
+  void cycleLoopMode() {
+    switch (_loopMode) {
+      case LoopModeType.off:
+        _loopMode = LoopModeType.repeatOne;
+        break;
+      case LoopModeType.repeatOne:
+        _loopMode = LoopModeType.repeatAll;
+        break;
+      case LoopModeType.repeatAll:
+        _loopMode = LoopModeType.playOnce;
+        break;
+      case LoopModeType.playOnce:
+        _loopMode = LoopModeType.off;
+        break;
+    }
+    _loopModeController.add(_loopMode);
   }
 
   /// Set the active Up Next queue and prefetch streams in background
@@ -77,6 +158,9 @@ class AudioPlayerService {
         _queue.add(t);
       }
     }
+    if (_isShuffle) {
+      _queue.shuffle();
+    }
     _queueController.add(_queue);
     _prefetchUpcomingUrls();
   }
@@ -86,14 +170,19 @@ class AudioPlayerService {
     final existingIds = _queue.map((t) => t.id).toSet();
     if (_currentTrack != null) existingIds.add(_currentTrack!.id);
 
+    final incoming = <Track>[];
     for (final track in moreTracks) {
       final cleanTitle = track.title.toLowerCase().trim();
       if (!existingIds.contains(track.id) &&
           !_sessionPlayedTrackIds.contains(track.id) &&
           !_sessionPlayedTitles.contains(cleanTitle)) {
-        _queue.add(track);
+        incoming.add(track);
       }
     }
+    if (_isShuffle) {
+      incoming.shuffle();
+    }
+    _queue.addAll(incoming);
     _queueController.add(_queue);
     _prefetchUpcomingUrls();
   }
@@ -198,10 +287,22 @@ class AudioPlayerService {
   }
 
   /// Play a track directly
-  Future<void> playTrack(Track track, {List<Track>? initialQueue}) async {
+  Future<void> playTrack(
+    Track track, {
+    List<Track>? initialQueue,
+    bool resetQueue = false,
+  }) async {
+    if (resetQueue) {
+      _queue.clear();
+      _playbackHistory.clear();
+      _historyController.add(_playbackHistory);
+      _queueController.add(_queue);
+      _recentVibeSeeds.clear();
+    }
+
     if (initialQueue != null) {
       setQueue(initialQueue);
-    } else {
+    } else if (!resetQueue) {
       _queue.removeWhere((t) => t.id == track.id);
       _queueController.add(_queue);
     }
@@ -356,6 +457,10 @@ class AudioPlayerService {
     _isAutoReplenishing = false;
   }
 
+  Future<void> play() async {
+    await _player.play();
+  }
+
   Future<void> pause() async {
     await _player.pause();
   }
@@ -379,6 +484,8 @@ class AudioPlayerService {
   void dispose() {
     _currentTrackController.close();
     _isPreloadingController.close();
+    _loopModeController.close();
+    _isShuffleController.close();
     _queueController.close();
     _historyController.close();
     _player.dispose();

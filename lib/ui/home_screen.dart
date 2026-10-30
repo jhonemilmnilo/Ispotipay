@@ -246,7 +246,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   void _playTrack(Track track) async {
-    await AudioPlayerService().playTrack(track);
+    await AudioPlayerService().playTrack(track, resetQueue: true);
     _loadAllSections();
   }
 
