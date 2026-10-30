@@ -44,8 +44,12 @@ class AudioPlayerService {
   final Set<String> _sessionPlayedTrackIds = {};
   final Set<String> _sessionPlayedTitles = {};
 
-  // Stack of previously played tracks for the Previous button
+  // Stack of previously played tracks for the Previous button & History
   final List<Track> _playbackHistory = [];
+  List<Track> get playbackHistory => List.unmodifiable(_playbackHistory);
+
+  final _historyController = StreamController<List<Track>>.broadcast();
+  Stream<List<Track>> get historyStream => _historyController.stream;
 
   // Contextual Vibe memory: tracks history in current session to seed future radio chunks
   final List<Track> _recentVibeSeeds = [];
@@ -94,6 +98,32 @@ class AudioPlayerService {
     _prefetchUpcomingUrls();
   }
 
+  /// User taps a specific track in the Previous/History list:
+  /// Rewind queue so this track plays, and all subsequent history + current becomes upcoming!
+  Future<void> playFromHistory(int historyIndex) async {
+    if (historyIndex < 0 || historyIndex >= _playbackHistory.length) return;
+
+    final selectedTrack = _playbackHistory[historyIndex];
+
+    // Everything after this history index moves back to the upcoming queue
+    final subsequentHistory = _playbackHistory.sublist(historyIndex + 1);
+    _playbackHistory.removeRange(historyIndex, _playbackHistory.length);
+    _historyController.add(_playbackHistory);
+
+    final newQueue = <Track>[];
+    newQueue.addAll(subsequentHistory);
+    if (_currentTrack != null) {
+      newQueue.add(_currentTrack!);
+    }
+    newQueue.addAll(_queue);
+
+    _queue.clear();
+    _queue.addAll(newQueue);
+    _queueController.add(_queue);
+
+    await _executePlay(selectedTrack, addToHistory: false);
+  }
+
   /// User taps a specific track in the Up Next list:
   /// Play that track and slice the queue so all songs below it become the upcoming queue in order!
   Future<void> playFromQueue(int index) async {
@@ -125,6 +155,7 @@ class AudioPlayerService {
   Future<void> _executePlay(Track track, {bool addToHistory = true}) async {
     if (addToHistory && _currentTrack != null && _currentTrack!.id != track.id) {
       _playbackHistory.add(_currentTrack!);
+      _historyController.add(_playbackHistory);
     }
 
     await _player.pause();
@@ -213,6 +244,7 @@ class AudioPlayerService {
 
     if (_playbackHistory.isNotEmpty) {
       final prevTrack = _playbackHistory.removeLast();
+      _historyController.add(_playbackHistory);
 
       // Put current track back to front of upcoming queue so user doesn't lose their place
       if (_currentTrack != null) {
@@ -291,6 +323,7 @@ class AudioPlayerService {
     _currentTrackController.close();
     _isPreloadingController.close();
     _queueController.close();
+    _historyController.close();
     _player.dispose();
   }
 }

@@ -31,16 +31,19 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   bool _isFavorite = false;
 
   List<Track> _upNextTracks = [];
+  List<Track> _historyTracks = [];
   bool _isLoadingUpNext = false;
   bool _isLoadingMoreUpNext = false;
 
   StreamSubscription<Track?>? _trackSub;
   StreamSubscription<List<Track>>? _queueSub;
+  StreamSubscription<List<Track>>? _historySub;
 
   @override
   void initState() {
     super.initState();
     _activeTrack = widget.track;
+    _historyTracks = List.from(_audioService.playbackHistory);
     _shimmerController = AnimationController.unbounded(vsync: this)
       ..repeat(min: 0.0, max: 1.0, period: const Duration(milliseconds: 1200));
 
@@ -60,6 +63,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         if (mounted) {
           setState(() {
             _activeTrack = newTrack;
+            _historyTracks = List.from(_audioService.playbackHistory);
             _lyrics = [];
             _isLoadingLyrics = true;
           });
@@ -77,12 +81,22 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         });
       }
     });
+
+    // Listen to history updates from AudioPlayerService
+    _historySub = _audioService.historyStream.listen((updatedHistory) {
+      if (mounted) {
+        setState(() {
+          _historyTracks = List.from(updatedHistory);
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _trackSub?.cancel();
     _queueSub?.cancel();
+    _historySub?.cancel();
     _shimmerController.dispose();
     _exploreService.dispose();
     super.dispose();
@@ -125,6 +139,251 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         _isLoadingMoreUpNext = false;
       });
     }
+  }
+
+  Widget _buildUnifiedQueueItem({
+    required BuildContext ctx,
+    required Track track,
+    required bool isPlaying,
+    required bool isHistory,
+    required int listIndex,
+  }) {
+    if (isPlaying) {
+      // Live Track: Centerpiece with rotating circular progress border around thumbnail!
+      return StreamBuilder<Duration>(
+        stream: _audioService.positionStream,
+        builder: (context, posSnap) {
+          final pos = posSnap.data ?? Duration.zero;
+          return StreamBuilder<Duration?>(
+            stream: _audioService.durationStream,
+            builder: (context, durSnap) {
+              final dur = durSnap.data ?? Duration.zero;
+              final double progress = dur.inMilliseconds > 0
+                  ? (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0)
+                  : 0.0;
+
+              return Container(
+                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppTheme.primary.withValues(alpha: 0.28),
+                      const Color(0xFF0F1829),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppTheme.accentLime.withValues(alpha: 0.45),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.accentLime.withValues(alpha: 0.08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    // Circular Progress Rotating Border wrapping the thumbnail
+                    SizedBox(
+                      width: 52,
+                      height: 52,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            value: progress,
+                            strokeWidth: 2.8,
+                            backgroundColor: AppTheme.surfaceLight.withValues(alpha: 0.3),
+                            color: AppTheme.accentLime,
+                          ),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(22),
+                            child: track.thumbnailUrl != null
+                                ? Image.network(
+                                    track.thumbnailUrl!,
+                                    width: 42,
+                                    height: 42,
+                                    fit: BoxFit.cover,
+                                    frameBuilder: (context, child, frame, wasSync) {
+                                      if (wasSync || frame != null) return child;
+                                      return _buildCustomThumbnail(
+                                        title: track.title,
+                                        artist: track.artist,
+                                        size: 42,
+                                      );
+                                    },
+                                    errorBuilder: (_, _, _) => _buildCustomThumbnail(
+                                      title: track.title,
+                                      artist: track.artist,
+                                      size: 42,
+                                    ),
+                                  )
+                                : _buildCustomThumbnail(
+                                    title: track.title,
+                                    artist: track.artist,
+                                    size: 42,
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.graphic_eq, color: AppTheme.accentLime, size: 14),
+                              SizedBox(width: 4),
+                              Text(
+                                'PLAYING NOW',
+                                style: TextStyle(
+                                  color: AppTheme.accentLime,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            track.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppTheme.textPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            track.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppTheme.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      _formatDuration(pos),
+                      style: const TextStyle(
+                        color: AppTheme.accentLime,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    }
+
+    // Finished History Song or Upcoming Queue Song
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: Stack(
+        alignment: Alignment.center,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Opacity(
+              opacity: isHistory ? 0.6 : 1.0,
+              child: track.thumbnailUrl != null
+                  ? Image.network(
+                      track.thumbnailUrl!,
+                      width: 44,
+                      height: 44,
+                      fit: BoxFit.cover,
+                      frameBuilder: (context, child, frame, wasSync) {
+                        if (wasSync || frame != null) return child;
+                        return _buildCustomThumbnail(
+                          title: track.title,
+                          artist: track.artist,
+                          size: 44,
+                        );
+                      },
+                      errorBuilder: (_, _, _) => _buildCustomThumbnail(
+                        title: track.title,
+                        artist: track.artist,
+                        size: 44,
+                      ),
+                    )
+                  : _buildCustomThumbnail(
+                      title: track.title,
+                      artist: track.artist,
+                      size: 44,
+                    ),
+            ),
+          ),
+          if (isHistory)
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.black45,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.check_circle_outline,
+                color: AppTheme.textSecondary,
+                size: 18,
+              ),
+            ),
+        ],
+      ),
+      title: Text(
+        track.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: isHistory
+              ? AppTheme.textSecondary
+              : AppTheme.textPrimary,
+          fontSize: 14,
+          fontWeight: isHistory ? FontWeight.normal : FontWeight.w500,
+        ),
+      ),
+      subtitle: Text(
+        isHistory ? '${track.artist} • Played' : track.artist,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: isHistory
+              ? AppTheme.textSecondary.withValues(alpha: 0.7)
+              : AppTheme.textSecondary,
+          fontSize: 12,
+        ),
+      ),
+      trailing: Icon(
+        isHistory ? Icons.replay_rounded : Icons.play_arrow_rounded,
+        color: AppTheme.textSecondary,
+        size: 22,
+      ),
+      onTap: () {
+        Navigator.pop(ctx);
+        if (isHistory) {
+          _audioService.playFromHistory(listIndex);
+        } else {
+          // Adjust for history count and current track
+          final queueIndex = listIndex - _historyTracks.length - 1;
+          _audioService.playFromQueue(queueIndex);
+        }
+      },
+    );
   }
 
   void _showUpNextDrawer(BuildContext context) {
@@ -221,179 +480,90 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   ),
                   const Divider(color: AppTheme.divider, height: 24),
 
-                  // Currently Playing Indicator Banner
-                  if (_activeTrack != null)
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4)),
-                      ),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: _activeTrack!.thumbnailUrl != null
-                                ? Image.network(
-                                    _activeTrack!.thumbnailUrl!,
-                                    width: 38,
-                                    height: 38,
-                                    fit: BoxFit.cover,
-                                    frameBuilder: (context, child, frame, wasSync) {
-                                      if (wasSync || frame != null) return child;
-                                      return _buildCustomThumbnail(
-                                        title: _activeTrack!.title,
-                                        artist: _activeTrack!.artist,
-                                        size: 38,
-                                      );
-                                    },
-                                    errorBuilder: (_, _, _) => _buildCustomThumbnail(
-                                      title: _activeTrack!.title,
-                                      artist: _activeTrack!.artist,
-                                      size: 38,
-                                    ),
-                                  )
-                                : _buildCustomThumbnail(
-                                    title: _activeTrack!.title,
-                                    artist: _activeTrack!.artist,
-                                    size: 38,
-                                  ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.graphic_eq, color: AppTheme.accentLime, size: 14),
-                                    const SizedBox(width: 4),
-                                    const Text(
-                                      'PLAYING NOW',
-                                      style: TextStyle(
-                                        color: AppTheme.accentLime,
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  _activeTrack!.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: AppTheme.textPrimary,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  // Up Next Queue List
+                  // Unified Timeline Queue List: [Previous/History, Currently Playing, Upcoming Next]
                   Expanded(
                     child: _isLoadingUpNext
                         ? _buildUpNextShimmerList()
-                        : _upNextTracks.isEmpty
-                            ? const Center(
-                                child: Text(
-                                  'Queue is empty',
-                                  style: TextStyle(color: AppTheme.textSecondary),
-                                ),
-                              )
-                            : NotificationListener<ScrollNotification>(
-                                onNotification: (ScrollNotification scrollInfo) {
-                                  if (scrollInfo.metrics.pixels >=
-                                      scrollInfo.metrics.maxScrollExtent - 200) {
-                                    _loadMoreUpNext();
-                                  }
-                                  return false;
-                                },
-                                child: ListView.builder(
+                        : NotificationListener<ScrollNotification>(
+                            onNotification: (ScrollNotification scrollInfo) {
+                              if (scrollInfo.metrics.pixels >=
+                                  scrollInfo.metrics.maxScrollExtent - 200) {
+                                _loadMoreUpNext();
+                              }
+                              return false;
+                            },
+                            child: Builder(
+                              builder: (context) {
+                                final totalHistory = _historyTracks.length;
+                                final hasCurrent = _activeTrack != null;
+                                final totalUpcoming = _upNextTracks.length;
+                                final totalItems = totalHistory +
+                                    (hasCurrent ? 1 : 0) +
+                                    totalUpcoming +
+                                    (_isLoadingMoreUpNext ? 2 : 0);
+
+                                if (totalItems == 0) {
+                                  return const Center(
+                                    child: Text(
+                                      'Queue is empty',
+                                      style: TextStyle(color: AppTheme.textSecondary),
+                                    ),
+                                  );
+                                }
+
+                                return ListView.builder(
                                   controller: scrollController,
                                   physics: const BouncingScrollPhysics(
                                     parent: AlwaysScrollableScrollPhysics(),
                                   ),
-                                  itemCount: _upNextTracks.length + (_isLoadingMoreUpNext ? 2 : 0),
+                                  itemCount: totalItems,
                                   itemBuilder: (context, index) {
-                                    if (index >= _upNextTracks.length) {
+                                    // 1. Finished History Items (at the top)
+                                    if (index < totalHistory) {
+                                      final track = _historyTracks[index];
+                                      return _buildUnifiedQueueItem(
+                                        ctx: ctx,
+                                        track: track,
+                                        isPlaying: false,
+                                        isHistory: true,
+                                        listIndex: index,
+                                      );
+                                    }
+
+                                    // 2. Currently Playing Item (in the natural middle timeline)
+                                    final currentIndex = totalHistory;
+                                    if (hasCurrent && index == currentIndex) {
+                                      return _buildUnifiedQueueItem(
+                                        ctx: ctx,
+                                        track: _activeTrack!,
+                                        isPlaying: true,
+                                        isHistory: false,
+                                        listIndex: index,
+                                      );
+                                    }
+
+                                    // 3. Shimmer loading footer when paginating
+                                    final upcomingStartIndex = hasCurrent ? currentIndex + 1 : currentIndex;
+                                    final upcomingItemIndex = index - upcomingStartIndex;
+
+                                    if (upcomingItemIndex >= totalUpcoming) {
                                       return _buildShimmerQueueTile();
                                     }
-                                    final track = _upNextTracks[index];
-                                    return ListTile(
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 2,
-                                      ),
-                                      leading: ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: track.thumbnailUrl != null
-                                            ? Image.network(
-                                                track.thumbnailUrl!,
-                                                width: 46,
-                                                height: 46,
-                                                fit: BoxFit.cover,
-                                                frameBuilder: (context, child, frame, wasSync) {
-                                                  if (wasSync || frame != null) return child;
-                                                  return _buildCustomThumbnail(
-                                                    title: track.title,
-                                                    artist: track.artist,
-                                                    size: 46,
-                                                  );
-                                                },
-                                                errorBuilder: (_, _, _) => _buildCustomThumbnail(
-                                                  title: track.title,
-                                                  artist: track.artist,
-                                                  size: 46,
-                                                ),
-                                              )
-                                            : _buildCustomThumbnail(
-                                                title: track.title,
-                                                artist: track.artist,
-                                                size: 46,
-                                              ),
-                                      ),
-                                      title: Text(
-                                        track.title,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: AppTheme.textPrimary,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        track.artist,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          color: AppTheme.textSecondary,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      trailing: const Icon(
-                                        Icons.play_arrow_rounded,
-                                        color: AppTheme.textSecondary,
-                                        size: 24,
-                                      ),
-                                      onTap: () {
-                                        Navigator.pop(ctx);
-                                        _audioService.playFromQueue(index);
-                                      },
+
+                                    // 4. Upcoming Up Next items (below currently playing)
+                                    final track = _upNextTracks[upcomingItemIndex];
+                                    return _buildUnifiedQueueItem(
+                                      ctx: ctx,
+                                      track: track,
+                                      isPlaying: false,
+                                      isHistory: false,
+                                      listIndex: index,
                                     );
                                   },
-                                ),
-                              ),
+                                );
+                              },
+                            ),
+                          ),
                   ),
                 ],
               ),
