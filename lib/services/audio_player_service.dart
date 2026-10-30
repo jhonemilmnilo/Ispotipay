@@ -151,10 +151,18 @@ class AudioPlayerService {
   /// Set the active Up Next queue and prefetch streams in background
   void setQueue(List<Track> newQueue) {
     _queue.clear();
-    // Exclude anything that has already been played in this session
+    final historyIds = _playbackHistory.map((t) => t.id).toSet();
+    final seenIds = <String>{};
+    if (_currentTrack != null) seenIds.add(_currentTrack!.id);
+
+    // Exclude anything that has already been played in this session or exists in history
     for (final t in newQueue) {
-      if (!_sessionPlayedTrackIds.contains(t.id) &&
-          !_sessionPlayedTitles.contains(t.title.toLowerCase().trim())) {
+      final cleanTitle = t.title.toLowerCase().trim();
+      if (!seenIds.contains(t.id) &&
+          !historyIds.contains(t.id) &&
+          !_sessionPlayedTrackIds.contains(t.id) &&
+          !_sessionPlayedTitles.contains(cleanTitle)) {
+        seenIds.add(t.id);
         _queue.add(t);
       }
     }
@@ -169,6 +177,9 @@ class AudioPlayerService {
   void appendToQueue(List<Track> moreTracks) {
     final existingIds = _queue.map((t) => t.id).toSet();
     if (_currentTrack != null) existingIds.add(_currentTrack!.id);
+    for (final h in _playbackHistory) {
+      existingIds.add(h.id);
+    }
 
     final incoming = <Track>[];
     for (final track in moreTracks) {
@@ -176,6 +187,7 @@ class AudioPlayerService {
       if (!existingIds.contains(track.id) &&
           !_sessionPlayedTrackIds.contains(track.id) &&
           !_sessionPlayedTitles.contains(cleanTitle)) {
+        existingIds.add(track.id);
         incoming.add(track);
       }
     }
@@ -312,8 +324,11 @@ class AudioPlayerService {
 
   Future<void> _executePlay(Track track, {bool addToHistory = true}) async {
     if (addToHistory && _currentTrack != null && _currentTrack!.id != track.id) {
-      _playbackHistory.add(_currentTrack!);
-      _historyController.add(_playbackHistory);
+      // Avoid duplicate consecutive tracks in history
+      if (_playbackHistory.isEmpty || _playbackHistory.last.id != _currentTrack!.id) {
+        _playbackHistory.add(_currentTrack!);
+        _historyController.add(_playbackHistory);
+      }
     }
 
     await _player.pause();
