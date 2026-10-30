@@ -458,6 +458,79 @@ class MusicExploreService {
     return [];
   }
 
+  /// Search matching Artists and Albums via iTunes Search API
+  Future<List<Playlist>> searchArtistsAndAlbums(String query, {int limit = 10}) async {
+    if (query.trim().isEmpty) return [];
+
+    final List<Playlist> matchedPlaylists = [];
+    final seenTitles = <String>{};
+
+    try {
+      final encoded = Uri.encodeComponent(query.trim());
+
+      // Query both albums and music artists in parallel
+      final albumUrl = Uri.parse(
+        'https://itunes.apple.com/search?term=$encoded&entity=album&limit=$limit',
+      );
+      final artistUrl = Uri.parse(
+        'https://itunes.apple.com/search?term=$encoded&entity=musicArtist&limit=5',
+      );
+
+      final responses = await Future.wait([
+        _httpClient.get(albumUrl).timeout(const Duration(seconds: 5)).catchError((_) => http.Response('{}', 500)),
+        _httpClient.get(artistUrl).timeout(const Duration(seconds: 5)).catchError((_) => http.Response('{}', 500)),
+      ]);
+
+      // 1. Process matching Artists
+      if (responses[1].statusCode == 200) {
+        final artistData = json.decode(responses[1].body) as Map<String, dynamic>;
+        final artistResults = artistData['results'] as List? ?? [];
+        for (final a in artistResults) {
+          final artistName = a['artistName'] as String? ?? '';
+          if (artistName.isNotEmpty && !seenTitles.contains(artistName.toLowerCase())) {
+            seenTitles.add(artistName.toLowerCase());
+            matchedPlaylists.add(
+              Playlist(
+                id: 'artist_${a['artistId'] ?? artistName.hashCode}',
+                title: artistName,
+                description: 'Artist Discography & Top Tracks',
+                thumbnailUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&q=80',
+                searchQuery: artistName,
+              ),
+            );
+          }
+        }
+      }
+
+      // 2. Process matching Albums
+      if (responses[0].statusCode == 200) {
+        final albumData = json.decode(responses[0].body) as Map<String, dynamic>;
+        final albumResults = albumData['results'] as List? ?? [];
+        for (final alb in albumResults) {
+          final albumName = alb['collectionName'] as String? ?? '';
+          final artistName = alb['artistName'] as String? ?? '';
+          final artwork = (alb['artworkUrl100'] as String?)?.replaceAll('100x100bb', '600x600bb');
+          final key = '${albumName.toLowerCase()}_${artistName.toLowerCase()}';
+
+          if (albumName.isNotEmpty && !seenTitles.contains(key)) {
+            seenTitles.add(key);
+            matchedPlaylists.add(
+              Playlist(
+                id: 'album_${alb['collectionId'] ?? key.hashCode}',
+                title: albumName,
+                description: 'Album by $artistName',
+                thumbnailUrl: artwork,
+                searchQuery: '$albumName $artistName',
+              ),
+            );
+          }
+        }
+      }
+    } catch (_) {}
+
+    return matchedPlaylists;
+  }
+
   /// Get Official Top Hits with infinite paginated scrolling (15 per chunk) across country feeds
   Future<List<Track>> getTopMusic({int offset = 0, int limit = 15}) async {
     final countryFeeds = ['ph', 'us', 'gb', 'jp', 'kr'];

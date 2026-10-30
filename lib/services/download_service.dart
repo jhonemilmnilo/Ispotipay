@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as p;
@@ -6,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 import '../models/track.dart';
 import 'database_service.dart';
+import 'lyrics_service.dart';
 import 'music_explore_service.dart';
 
 class DownloadService {
@@ -16,6 +16,7 @@ class DownloadService {
   final YoutubeExplode _yt = YoutubeExplode();
   final DatabaseService _dbService = DatabaseService();
   final MusicExploreService _exploreService = MusicExploreService();
+  final LyricsService _lyricsService = LyricsService();
 
   /// Download both the audio stream (.m4a) and the companion synchronized lyrics (.lrc)
   Future<Track?> downloadTrack(
@@ -65,31 +66,14 @@ class DownloadService {
       await sink.close();
       client.close();
 
-      // 2. Fetch & Save Companion LRC Lyrics
+      // 2. Fetch & Save Companion LRC Lyrics using smart multi-tier lookup
       String? savedLyricsPath;
       try {
-        final cleanTitle = Uri.encodeComponent(
-          track.title.replaceAll(RegExp(r'\(.*?\)|\[.*?\]'), '').trim(),
-        );
-        final cleanArtist = Uri.encodeComponent(track.artist.trim());
-        final durationSeconds = (track.durationMs / 1000).round();
-
-        final url = Uri.parse(
-          'https://lrclib.net/api/get?track_name=$cleanTitle&artist_name=$cleanArtist&duration=$durationSeconds',
-        );
-
-        final lyricRes = await http.get(url, headers: {
-          'User-Agent': 'ispotipay-music-player (v1.0.0)',
-        }).timeout(const Duration(seconds: 4));
-
-        if (lyricRes.statusCode == 200) {
-          final data = json.decode(lyricRes.body) as Map<String, dynamic>;
-          final syncedLyrics = data['syncedLyrics'] as String? ?? data['plainLyrics'] as String?;
-          if (syncedLyrics != null && syncedLyrics.isNotEmpty) {
-            final lyricsFile = File(lyricsFilePath);
-            await lyricsFile.writeAsString(syncedLyrics);
-            savedLyricsPath = lyricsFilePath;
-          }
+        final rawLyrics = await _lyricsService.getRawLrcString(track);
+        if (rawLyrics != null && rawLyrics.trim().isNotEmpty) {
+          final lyricsFile = File(lyricsFilePath);
+          await lyricsFile.writeAsString(rawLyrics.trim());
+          savedLyricsPath = lyricsFilePath;
         }
       } catch (_) {}
 

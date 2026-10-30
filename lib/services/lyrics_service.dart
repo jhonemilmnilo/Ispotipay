@@ -36,14 +36,13 @@ class LyricsService {
     return lines;
   }
 
-  /// Fetch lyrics: Checks local file first (offline support), then multi-tier LRCLIB query
-  Future<List<LyricLine>> getLyrics(Track track) async {
+  /// Fetch raw LRC content string with smart multi-tier fallback (exact -> title+artist -> title)
+  Future<String?> getRawLrcString(Track track) async {
     // 1. Check local file if track is downloaded
     if (track.lyricsPath != null && track.lyricsPath!.isNotEmpty) {
       final file = File(track.lyricsPath!);
       if (await file.exists()) {
-        final content = await file.readAsString();
-        return parseLrc(content);
+        return await file.readAsString();
       }
     }
 
@@ -53,32 +52,57 @@ class LyricsService {
     final cleanArtist = Uri.encodeComponent(
       track.artist.split(RegExp(r'[,&]')).first.trim(),
     );
+    final durationSec = (track.durationMs / 1000).round();
 
-    // 2. Tier 1: Try direct match without strict duration constraint
+    // Tier 1: Exact match with duration (lrclib /api/get)
     try {
       final url = Uri.parse(
-        'https://lrclib.net/api/get?track_name=$cleanTitle&artist_name=$cleanArtist',
+        'https://lrclib.net/api/get?track_name=$cleanTitle&artist_name=$cleanArtist&duration=$durationSec',
       );
-
       final response = await http.get(url, headers: {
         'User-Agent': 'ispotipay-music-player (v1.0.0)',
       }).timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
-        final syncedLyrics = data['syncedLyrics'] as String?;
-        if (syncedLyrics != null && syncedLyrics.isNotEmpty) {
-          return parseLrc(syncedLyrics);
+        final synced = data['syncedLyrics'] as String?;
+        if (synced != null && synced.trim().isNotEmpty) {
+          return synced;
+        }
+        final plain = data['plainLyrics'] as String?;
+        if (plain != null && plain.trim().isNotEmpty) {
+          return plain;
         }
       }
     } catch (_) {}
 
-    // 3. Tier 2: Search fallback (resolves remixes, featuring artists, and catalog discrepancies)
+    // Tier 2: Match without duration constraint
+    try {
+      final url = Uri.parse(
+        'https://lrclib.net/api/get?track_name=$cleanTitle&artist_name=$cleanArtist',
+      );
+      final response = await http.get(url, headers: {
+        'User-Agent': 'ispotipay-music-player (v1.0.0)',
+      }).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final synced = data['syncedLyrics'] as String?;
+        if (synced != null && synced.trim().isNotEmpty) {
+          return synced;
+        }
+        final plain = data['plainLyrics'] as String?;
+        if (plain != null && plain.trim().isNotEmpty) {
+          return plain;
+        }
+      }
+    } catch (_) {}
+
+    // Tier 3: Search fallback query (handles remixes, ft. artists, punctuation differences)
     try {
       final searchUrl = Uri.parse(
         'https://lrclib.net/api/search?q=$cleanTitle+$cleanArtist',
       );
-
       final searchResponse = await http.get(searchUrl, headers: {
         'User-Agent': 'ispotipay-music-player (v1.0.0)',
       }).timeout(const Duration(seconds: 4));
@@ -87,24 +111,35 @@ class LyricsService {
         final results = json.decode(searchResponse.body) as List;
         for (final item in results) {
           final syncedLyrics = item['syncedLyrics'] as String?;
-          if (syncedLyrics != null && syncedLyrics.isNotEmpty) {
-            return parseLrc(syncedLyrics);
+          if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
+            return syncedLyrics;
           }
         }
-
-        // Fallback to plain lyrics if synced isn't available
         for (final item in results) {
           final plainLyrics = item['plainLyrics'] as String?;
-          if (plainLyrics != null && plainLyrics.isNotEmpty) {
-            return const LineSplitter()
-                .convert(plainLyrics)
-                .map((line) => LyricLine(timestamp: Duration.zero, text: line))
-                .toList();
+          if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
+            return plainLyrics;
           }
         }
       }
     } catch (_) {}
 
+    return null;
+  }
+
+  /// Fetch lyrics: Checks local file first (offline support), then multi-tier LRCLIB query
+  Future<List<LyricLine>> getLyrics(Track track) async {
+    final rawLrc = await getRawLrcString(track);
+    if (rawLrc != null && rawLrc.trim().isNotEmpty) {
+      final parsed = parseLrc(rawLrc);
+      if (parsed.isNotEmpty) return parsed;
+
+      // If it has plain text without LRC timestamps, convert line-by-line
+      return const LineSplitter()
+          .convert(rawLrc)
+          .map((line) => LyricLine(timestamp: Duration.zero, text: line))
+          .toList();
+    }
     return [];
   }
 }

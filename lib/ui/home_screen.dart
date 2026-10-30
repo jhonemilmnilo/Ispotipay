@@ -48,6 +48,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _isLoadingMoreAll = false;
   bool _isSearching = false;
   List<Track> _searchResults = [];
+  List<Playlist> _searchMatchedAlbums = [];
   int _playlistOffset = 0;
   int _topMusicOffset = 0;
 
@@ -237,17 +238,26 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       setState(() {
         _isSearching = false;
         _searchResults = [];
+        _searchMatchedAlbums = [];
       });
       return;
     }
 
     // 400ms Debounce rule
     _debounceTimer = Timer(const Duration(milliseconds: 400), () async {
-      final results = await _exploreService.searchTracks(query);
+      final futures = await Future.wait([
+        _exploreService.searchTracks(query),
+        _exploreService.searchArtistsAndAlbums(query),
+      ]);
+
+      final tracks = futures[0] as List<Track>;
+      final albums = futures[1] as List<Playlist>;
+
       if (mounted) {
         setState(() {
           _isSearching = true;
-          _searchResults = results;
+          _searchResults = tracks;
+          _searchMatchedAlbums = albums;
         });
       }
     });
@@ -419,12 +429,151 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
 
             if (_isSearching) ...[
-              // Search Results View
+              // Search Results View: Artists & Albums Section if available
+              if (_searchMatchedAlbums.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                    child: Text(
+                      'Artists & Albums (${_searchMatchedAlbums.length})',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 165,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _searchMatchedAlbums.length,
+                      separatorBuilder: (context, index) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final album = _searchMatchedAlbums[index];
+                        final isArtist = album.id.startsWith('artist_');
+
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PlaylistScreen(playlist: album),
+                              ),
+                            ).then((_) => _loadLocalLibrary());
+                          },
+                          child: Container(
+                            width: 120,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isArtist
+                                    ? AppTheme.accentLime.withValues(alpha: 0.3)
+                                    : AppTheme.primary.withValues(alpha: 0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(isArtist ? 45 : 8),
+                                      child: album.thumbnailUrl != null
+                                          ? Image.network(
+                                              album.thumbnailUrl!,
+                                              width: 90,
+                                              height: 90,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) => Container(
+                                                width: 90,
+                                                height: 90,
+                                                color: AppTheme.surfaceLight,
+                                                child: Icon(
+                                                  isArtist ? Icons.person : Icons.album,
+                                                  color: AppTheme.textSecondary,
+                                                  size: 32,
+                                                ),
+                                              ),
+                                            )
+                                          : Container(
+                                              width: 90,
+                                              height: 90,
+                                              color: AppTheme.surfaceLight,
+                                              child: Icon(
+                                                isArtist ? Icons.person : Icons.album,
+                                                color: AppTheme.textSecondary,
+                                                size: 32,
+                                              ),
+                                            ),
+                                    ),
+                                    Positioned(
+                                      top: 4,
+                                      left: 4,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withValues(alpha: 0.75),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          isArtist ? 'ARTIST' : 'ALBUM',
+                                          style: TextStyle(
+                                            color: isArtist ? AppTheme.accentLime : AppTheme.textPrimary,
+                                            fontSize: 8,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  album.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: AppTheme.textPrimary,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  album.description,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 12)),
+              ],
+
+              // Songs Section
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(
-                    'Search Results (${_searchResults.length})',
+                    'Songs (${_searchResults.length})',
                     style: const TextStyle(
                       color: AppTheme.textPrimary,
                       fontSize: 18,
