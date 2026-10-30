@@ -5,6 +5,7 @@ import '../models/lyric_line.dart';
 import '../models/track.dart';
 import '../services/audio_player_service.dart';
 import '../services/database_service.dart';
+import '../services/download_service.dart';
 import '../services/lyrics_service.dart';
 import '../services/music_explore_service.dart';
 import 'app_theme.dart';
@@ -29,6 +30,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
   List<LyricLine> _lyrics = [];
   bool _isLoadingLyrics = true;
   bool _isFavorite = false;
+  bool _isDownloading = false;
 
   List<Track> _upNextTracks = [];
   List<Track> _historyTracks = [];
@@ -697,6 +699,56 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     return index;
   }
 
+  Future<void> _handleDownload() async {
+    final track = _activeTrack;
+    if (track == null) return;
+
+    if (track.isDownloaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Song already downloaded for offline playback'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+
+    if (_isDownloading) return;
+
+    setState(() {
+      _isDownloading = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Downloading "${track.title}"...'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+
+    final downloaded = await DownloadService().downloadTrack(track);
+
+    if (mounted) {
+      setState(() {
+        _isDownloading = false;
+        if (downloaded != null) {
+          _activeTrack = downloaded;
+        }
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            downloaded != null
+                ? 'Downloaded "${track.title}" + Synced lyrics!'
+                : 'Download failed. Please try again.',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   String _formatDuration(Duration d) {
     final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
@@ -743,6 +795,42 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           ],
         ),
         centerTitle: true,
+        actions: [
+          // Download Track Button
+          IconButton(
+            icon: _isDownloading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppTheme.accentLime,
+                    ),
+                  )
+                : Icon(
+                    (_activeTrack?.isDownloaded ?? false)
+                        ? Icons.download_done_rounded
+                        : Icons.download_rounded,
+                    color: (_activeTrack?.isDownloaded ?? false)
+                        ? AppTheme.accentLime
+                        : AppTheme.textPrimary,
+                    size: 22,
+                  ),
+            tooltip: (_activeTrack?.isDownloaded ?? false) ? 'Downloaded' : 'Download for offline',
+            onPressed: _handleDownload,
+          ),
+          // Up Next / Queue Drawer Button
+          IconButton(
+            icon: const Icon(
+              Icons.queue_music_rounded,
+              color: AppTheme.textPrimary,
+              size: 24,
+            ),
+            tooltip: 'Up Next',
+            onPressed: () => _showUpNextDrawer(context),
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -934,19 +1022,8 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                       ),
                       const SizedBox(height: 12),
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          // Left: YouTube Music Style Up Next Queue Button
-                          IconButton(
-                            icon: const Icon(
-                              Icons.queue_music,
-                              color: AppTheme.textPrimary,
-                              size: 26,
-                            ),
-                            tooltip: 'Up Next',
-                            onPressed: () => _showUpNextDrawer(context),
-                          ),
-
                           // Shuffle Toggle Button
                           StreamBuilder<bool>(
                             stream: _audioService.isShuffleStream,
@@ -959,7 +1036,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                   color: isShuffle
                                       ? AppTheme.accentLime
                                       : AppTheme.textSecondary.withValues(alpha: 0.6),
-                                  size: 22,
+                                  size: 24,
                                 ),
                                 tooltip: isShuffle ? 'Shuffle: On' : 'Shuffle: Off',
                                 onPressed: () {
@@ -980,66 +1057,58 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             },
                           ),
 
-                          // Center Cluster: Previous, Play/Pause, Next
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Previous Song Button
-                              IconButton(
-                                iconSize: 38,
-                                icon: const Icon(
-                                  Icons.skip_previous_rounded,
-                                  color: AppTheme.textPrimary,
+                          // Previous Song Button
+                          IconButton(
+                            iconSize: 42,
+                            icon: const Icon(
+                              Icons.skip_previous_rounded,
+                              color: AppTheme.textPrimary,
+                            ),
+                            tooltip: 'Previous',
+                            onPressed: () => _audioService.playPrevious(),
+                          ),
+
+                          // Main Play / Pause Button
+                          StreamBuilder<PlayerState>(
+                            stream: _audioService.playerStateStream,
+                            builder: (context, snapshot) {
+                              final isPlaying = snapshot.data?.playing ?? false;
+                              final processing = snapshot.data?.processingState;
+
+                              if (processing == ProcessingState.buffering ||
+                                  processing == ProcessingState.loading) {
+                                return const SizedBox(
+                                  width: 64,
+                                  height: 64,
+                                  child: Padding(
+                                    padding: EdgeInsets.all(14.0),
+                                    child: CircularProgressIndicator(color: AppTheme.accentLime),
+                                  ),
+                                );
+                              }
+
+                              return IconButton(
+                                iconSize: 64,
+                                icon: Icon(
+                                  isPlaying
+                                      ? Icons.pause_circle_filled
+                                      : Icons.play_circle_filled,
+                                  color: AppTheme.accentLime,
                                 ),
-                                tooltip: 'Previous',
-                                onPressed: () => _audioService.playPrevious(),
-                              ),
-                              const SizedBox(width: 8),
+                                onPressed: () => _audioService.togglePlayPause(),
+                              );
+                            },
+                          ),
 
-                              // Main Play / Pause Button
-                              StreamBuilder<PlayerState>(
-                                stream: _audioService.playerStateStream,
-                                builder: (context, snapshot) {
-                                  final isPlaying = snapshot.data?.playing ?? false;
-                                  final processing = snapshot.data?.processingState;
-
-                                  if (processing == ProcessingState.buffering ||
-                                      processing == ProcessingState.loading) {
-                                    return const SizedBox(
-                                      width: 60,
-                                      height: 60,
-                                      child: Padding(
-                                        padding: EdgeInsets.all(14.0),
-                                        child: CircularProgressIndicator(color: AppTheme.accentLime),
-                                      ),
-                                    );
-                                  }
-
-                                  return IconButton(
-                                    iconSize: 60,
-                                    icon: Icon(
-                                      isPlaying
-                                          ? Icons.pause_circle_filled
-                                          : Icons.play_circle_filled,
-                                      color: AppTheme.accentLime,
-                                    ),
-                                    onPressed: () => _audioService.togglePlayPause(),
-                                  );
-                                },
-                              ),
-                              const SizedBox(width: 8),
-
-                              // Next Song Button (Strictly plays next track in Up Next queue)
-                              IconButton(
-                                iconSize: 38,
-                                icon: const Icon(
-                                  Icons.skip_next_rounded,
-                                  color: AppTheme.textPrimary,
-                                ),
-                                tooltip: 'Next',
-                                onPressed: () => _audioService.playNext(),
-                              ),
-                            ],
+                          // Next Song Button
+                          IconButton(
+                            iconSize: 42,
+                            icon: const Icon(
+                              Icons.skip_next_rounded,
+                              color: AppTheme.textPrimary,
+                            ),
+                            tooltip: 'Next',
+                            onPressed: () => _audioService.playNext(),
                           ),
 
                           // Repeat Mode Toggle Button
@@ -1078,7 +1147,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                 icon: Icon(
                                   iconData,
                                   color: iconColor,
-                                  size: 22,
+                                  size: 24,
                                 ),
                                 tooltip: label,
                                 onPressed: () {
@@ -1111,7 +1180,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                             },
                           ),
 
-                          // Right: Favorite Heart Toggle
+                          // Favorite Heart Toggle Button
                           IconButton(
                             icon: Icon(
                               _isFavorite ? Icons.favorite : Icons.favorite_border,
