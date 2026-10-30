@@ -60,9 +60,22 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
     final results = await _exploreService.searchTracks(widget.playlist.searchQuery, limit: 25);
     if (mounted) {
       setState(() {
-        _tracks.addAll(results);
+        final existingIds = <String>{};
+        final existingTitles = <String>{};
+        final cleanList = <Track>[];
+
+        for (final t in results) {
+          final normKey = '${t.title.toLowerCase().trim()}_${t.artist.toLowerCase().trim()}';
+          if (!existingIds.contains(t.id) && !existingTitles.contains(normKey)) {
+            existingIds.add(t.id);
+            existingTitles.add(normKey);
+            cleanList.add(t);
+          }
+        }
+
+        _tracks.addAll(cleanList);
         _isLoading = false;
-        _offset = results.length;
+        _offset = cleanList.length;
       });
     }
   }
@@ -79,9 +92,16 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
 
     if (mounted) {
       setState(() {
-        final existing = _tracks.map((t) => t.id).toSet();
+        final existingIds = _tracks.map((t) => t.id).toSet();
+        final existingTitles = _tracks
+            .map((t) => '${t.title.toLowerCase().trim()}_${t.artist.toLowerCase().trim()}')
+            .toSet();
+
         for (final t in results) {
-          if (!existing.contains(t.id)) {
+          final normKey = '${t.title.toLowerCase().trim()}_${t.artist.toLowerCase().trim()}';
+          if (!existingIds.contains(t.id) && !existingTitles.contains(normKey)) {
+            existingIds.add(t.id);
+            existingTitles.add(normKey);
             _tracks.add(t);
           }
         }

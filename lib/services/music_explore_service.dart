@@ -421,7 +421,11 @@ class MusicExploreService {
         final data = json.decode(response.body) as Map<String, dynamic>;
         final results = data['results'] as List;
 
-        return results.map((item) {
+        final seenIds = <String>{};
+        final seenTitles = <String>{};
+        final tracks = <Track>[];
+
+        for (final item in results) {
           final trackId = item['trackId'].toString();
           final title = item['trackName'] as String? ?? 'Unknown Title';
           final artist = item['artistName'] as String? ?? 'Unknown Artist';
@@ -429,15 +433,25 @@ class MusicExploreService {
           final durationMs = (item['trackTimeMillis'] as num?)?.toInt() ?? 0;
           final artworkUrl = (item['artworkUrl100'] as String?)?.replaceAll('100x100bb', '600x600bb');
 
-          return Track(
-            id: trackId,
-            title: title,
-            artist: artist,
-            album: album,
-            durationMs: durationMs,
-            thumbnailUrl: artworkUrl,
-          );
-        }).toList();
+          // Strict deduplication by trackId and clean normalized title+artist
+          final normalizedKey = '${title.toLowerCase().trim()}_${artist.toLowerCase().trim()}';
+          if (!seenIds.contains(trackId) && !seenTitles.contains(normalizedKey)) {
+            seenIds.add(trackId);
+            seenTitles.add(normalizedKey);
+            tracks.add(
+              Track(
+                id: trackId,
+                title: title,
+                artist: artist,
+                album: album,
+                durationMs: durationMs,
+                thumbnailUrl: artworkUrl,
+              ),
+            );
+          }
+        }
+
+        return tracks;
       }
     } catch (_) {}
 

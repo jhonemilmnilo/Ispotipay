@@ -343,16 +343,29 @@ class AudioPlayerService {
     _playbackHistory.clear();
     _queue.clear();
 
-    final selectedIndex = allPlaylistTracks.indexWhere((t) => t.id == track.id);
+    // Deduplicate incoming album tracks strictly by id and title
+    final cleanTracks = <Track>[];
+    final seenIds = <String>{};
+    final seenTitles = <String>{};
+    for (final t in allPlaylistTracks) {
+      final norm = '${t.title.toLowerCase().trim()}_${t.artist.toLowerCase().trim()}';
+      if (!seenIds.contains(t.id) && !seenTitles.contains(norm)) {
+        seenIds.add(t.id);
+        seenTitles.add(norm);
+        cleanTracks.add(t);
+      }
+    }
+
+    final selectedIndex = cleanTracks.indexWhere((t) => t.id == track.id);
 
     if (selectedIndex != -1) {
       // Everything before the selected track in the album becomes history
-      final priorTracks = allPlaylistTracks.sublist(0, selectedIndex);
+      final priorTracks = cleanTracks.sublist(0, selectedIndex);
       _playbackHistory.addAll(priorTracks);
       _historyController.add(_playbackHistory);
 
       // Everything after the selected track becomes the upcoming queue
-      final subsequentTracks = allPlaylistTracks.sublist(selectedIndex + 1);
+      final subsequentTracks = cleanTracks.sublist(selectedIndex + 1);
       _queue.addAll(subsequentTracks);
       if (_isShuffle) {
         _queue.shuffle();
@@ -361,7 +374,7 @@ class AudioPlayerService {
       _prefetchUpcomingUrls();
     } else {
       // Fallback: put all others in queue
-      for (final t in allPlaylistTracks) {
+      for (final t in cleanTracks) {
         if (t.id != track.id) {
           _queue.add(t);
         }

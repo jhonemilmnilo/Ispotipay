@@ -54,10 +54,10 @@ class _PlayerScreenState extends State<PlayerScreen>
     _loadLyrics(_activeTrack!);
     _checkFavoriteStatus(_activeTrack!);
 
-    // If AudioPlayerService already has a populated queue, use it; otherwise generate fresh
+    // If AudioPlayerService already has a populated queue, use it; otherwise generate fresh (radio mode only)
     if (_audioService.queue.isNotEmpty) {
       _upNextTracks = List.from(_audioService.queue);
-    } else {
+    } else if (!_audioService.isFixedQueueMode) {
       _loadUpNext(_activeTrack!);
     }
 
@@ -116,6 +116,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   Future<void> _loadUpNext(Track track) async {
+    if (_audioService.isFixedQueueMode) return;
     setState(() {
       _isLoadingUpNext = true;
     });
@@ -131,7 +132,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   }
 
   Future<void> _loadMoreUpNext() async {
-    if (_isLoadingMoreUpNext || _activeTrack == null) return;
+    if (_audioService.isFixedQueueMode || _isLoadingMoreUpNext || _activeTrack == null) return;
     setState(() {
       _isLoadingMoreUpNext = true;
     });
