@@ -72,6 +72,12 @@ class AudioPlayerService {
   // Contextual Vibe memory: tracks history in current session to seed future radio chunks
   final List<Track> _recentVibeSeeds = [];
 
+  // Fixed Album/Playlist queue mode flag (disables random radio auto-replenishment)
+  bool _isFixedQueueMode = false;
+  bool get isFixedQueueMode => _isFixedQueueMode;
+  String? _queueSourceTitle;
+  String? get queueSourceTitle => _queueSourceTitle;
+
   // Stream URL pre-warmed cache for instant 0-delay playback
   final Map<String, String> _urlCache = {};
   bool _isAutoReplenishing = false;
@@ -304,6 +310,9 @@ class AudioPlayerService {
     List<Track>? initialQueue,
     bool resetQueue = false,
   }) async {
+    _isFixedQueueMode = false;
+    _queueSourceTitle = null;
+
     if (resetQueue) {
       _queue.clear();
       _playbackHistory.clear();
@@ -320,6 +329,51 @@ class AudioPlayerService {
     }
 
     await _executePlay(track, addToHistory: true);
+  }
+
+  /// Play track from an Album or Playlist with strict bounded tracks (no random songs, no omissions)
+  Future<void> playPlaylistTrack({
+    required Track track,
+    required List<Track> allPlaylistTracks,
+    String? sourceTitle,
+  }) async {
+    _isFixedQueueMode = true;
+    _queueSourceTitle = sourceTitle;
+
+    _playbackHistory.clear();
+    _queue.clear();
+
+    final selectedIndex = allPlaylistTracks.indexWhere((t) => t.id == track.id);
+
+    if (selectedIndex != -1) {
+      // Everything before the selected track in the album becomes history
+      final priorTracks = allPlaylistTracks.sublist(0, selectedIndex);
+      _playbackHistory.addAll(priorTracks);
+      _historyController.add(_playbackHistory);
+
+      // Everything after the selected track becomes the upcoming queue
+      final subsequentTracks = allPlaylistTracks.sublist(selectedIndex + 1);
+      _queue.addAll(subsequentTracks);
+      if (_isShuffle) {
+        _queue.shuffle();
+      }
+      _queueController.add(_queue);
+      _prefetchUpcomingUrls();
+    } else {
+      // Fallback: put all others in queue
+      for (final t in allPlaylistTracks) {
+        if (t.id != track.id) {
+          _queue.add(t);
+        }
+      }
+      if (_isShuffle) {
+        _queue.shuffle();
+      }
+      _queueController.add(_queue);
+      _prefetchUpcomingUrls();
+    }
+
+    await _executePlay(track, addToHistory: false);
   }
 
   Future<void> _executePlay(Track track, {bool addToHistory = true}) async {
@@ -379,8 +433,8 @@ class AudioPlayerService {
       // Trigger pre-warm for subsequent tracks
       _prefetchUpcomingUrls();
 
-      // If queue is running low (<= 3), auto-replenish from radio in background
-      if (_queue.length <= 3) {
+      // If queue is running low (<= 3), auto-replenish from radio in background (only in endless radio mode)
+      if (_queue.length <= 3 && !_isFixedQueueMode) {
         _autoReplenishQueue();
       }
     } catch (e) {
@@ -396,14 +450,17 @@ class AudioPlayerService {
       final nextTrack = _queue.removeAt(0);
       _queueController.add(_queue);
       await _executePlay(nextTrack, addToHistory: true);
-    } else if (_currentTrack != null) {
-      // Emergency queue replenishment if empty
+    } else if (!_isFixedQueueMode && _currentTrack != null) {
+      // Emergency queue replenishment if empty (only in radio mode)
       await _autoReplenishQueue();
       if (_queue.isNotEmpty) {
         final nextTrack = _queue.removeAt(0);
         _queueController.add(_queue);
         await _executePlay(nextTrack, addToHistory: true);
       }
+    } else {
+      // In Album/Playlist mode and queue is exhausted: gracefully stop/pause
+      await pause();
     }
   }
 
@@ -456,7 +513,7 @@ class AudioPlayerService {
 
   /// Automatically fetch new tracks based on currently playing and previous vibe context
   Future<void> _autoReplenishQueue() async {
-    if (_isAutoReplenishing || _currentTrack == null) return;
+    if (_isFixedQueueMode || _isAutoReplenishing || _currentTrack == null) return;
     _isAutoReplenishing = true;
 
     try {

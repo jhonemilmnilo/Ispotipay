@@ -571,7 +571,9 @@ class _PlayerScreenState extends State<PlayerScreen>
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
-                                              'Playing from: Radio • Similar to ${liveCurrent?.artist ?? ''}',
+                                              _audioService.isFixedQueueMode
+                                                  ? 'Playing from: ${_audioService.queueSourceTitle ?? "Album"}'
+                                                  : 'Playing from: Radio • Similar to ${liveCurrent?.artist ?? ''}',
                                               maxLines: 2,
                                               overflow: TextOverflow.ellipsis,
                                               style: const TextStyle(

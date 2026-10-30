@@ -92,7 +92,11 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
   }
 
   void _playTrack(Track track) {
-    _audioService.playTrack(track);
+    _audioService.playPlaylistTrack(
+      track: track,
+      allPlaylistTracks: List.from(_tracks),
+      sourceTitle: widget.playlist.title,
+    );
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => PlayerScreen(track: track)),
