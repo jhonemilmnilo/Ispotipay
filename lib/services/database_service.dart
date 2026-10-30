@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -10,6 +11,16 @@ class DatabaseService {
   DatabaseService._internal();
 
   Database? _database;
+
+  /// Broadcast stream to notify UI listeners whenever library data (favorites, downloads, plays) changes
+  final StreamController<void> _libraryUpdateController = StreamController<void>.broadcast();
+  Stream<void> get libraryUpdatesStream => _libraryUpdateController.stream;
+
+  void notifyLibraryChanged() {
+    if (!_libraryUpdateController.isClosed) {
+      _libraryUpdateController.add(null);
+    }
+  }
 
   Future<Database> init({String? customPath}) async {
     if (_database != null) return _database!;
@@ -86,6 +97,7 @@ class DatabaseService {
       track.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
+    notifyLibraryChanged();
   }
 
   /// Record a play event (increments play_count and adds to recents, capped at 15)
@@ -132,6 +144,7 @@ class DatabaseService {
         )
       ''');
     });
+    notifyLibraryChanged();
   }
 
   /// Get Recent Tracks (Max 15)
@@ -165,16 +178,20 @@ class DatabaseService {
     await saveTrack(track);
 
     final exists = await db.query('favorites', where: 'track_id = ?', whereArgs: [track.id]);
+    final bool isFav;
     if (exists.isNotEmpty) {
       await db.delete('favorites', where: 'track_id = ?', whereArgs: [track.id]);
-      return false; // un-favorited
+      isFav = false; // un-favorited
     } else {
       await db.insert('favorites', {
         'track_id': track.id,
         'created_at': DateTime.now().millisecondsSinceEpoch,
       });
-      return true; // favorited
+      isFav = true; // favorited
     }
+
+    notifyLibraryChanged();
+    return isFav;
   }
 
   /// Check if track is favorited

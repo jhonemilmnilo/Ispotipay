@@ -28,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   late AnimationController _shimmerController;
 
   Timer? _debounceTimer;
+  StreamSubscription<void>? _librarySubscription;
 
   final List<Track> _topMusic = [];
   final List<Track> _recommended = [];
@@ -61,12 +62,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _scrollController.addListener(_onScroll);
     _playlistScrollController.addListener(_onPlaylistScroll);
     _topMusicScrollController.addListener(_onTopMusicScroll);
+
+    // Real-time library updates listener (Favorites & Downloads counter parity)
+    _librarySubscription = _dbService.libraryUpdatesStream.listen((_) {
+      if (mounted) {
+        _loadLocalLibrary();
+      }
+    });
+
     _loadAllSections();
   }
 
   @override
   void dispose() {
     _debounceTimer?.cancel();
+    _librarySubscription?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     _playlistScrollController.dispose();
