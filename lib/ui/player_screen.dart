@@ -33,6 +33,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _isLoadingLyrics = true;
   bool _isFavorite = false;
   bool _isDownloading = false;
+  bool _isReaderMode = false;
 
   List<Track> _upNextTracks = [];
   List<Track> _historyTracks = [];
@@ -942,6 +943,28 @@ class _PlayerScreenState extends State<PlayerScreen>
         ),
         centerTitle: true,
         actions: [
+          // Toggle Synced Teleprompter vs Static Reader Mode
+          IconButton(
+            icon: Icon(
+              _isReaderMode ? Icons.mic_rounded : Icons.article_rounded,
+              color: _isReaderMode ? AppTheme.accentLime : AppTheme.textPrimary,
+              size: 22,
+            ),
+            tooltip: _isReaderMode ? 'Switch to Synced Lyrics' : 'Switch to Reader View',
+            onPressed: () {
+              setState(() {
+                _isReaderMode = !_isReaderMode;
+              });
+              AppToast.show(
+                context,
+                message: _isReaderMode
+                    ? 'Reader Mode • Paragraph View'
+                    : 'Synced Mode • Live Lyrics',
+                icon: _isReaderMode ? Icons.article_rounded : Icons.mic_rounded,
+                iconColor: AppTheme.accentLime,
+              );
+            },
+          ),
           // Download Track Button
           IconButton(
             icon: _isDownloading
@@ -1006,6 +1029,42 @@ class _PlayerScreenState extends State<PlayerScreen>
                     );
                   }
 
+                  if (_isReaderMode) {
+                    // Static Reader Mode: Clean paragraph/poem style scrolling without auto-movement or fading
+                    return ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      itemCount: _lyrics.length,
+                      itemBuilder: (context, index) {
+                        final line = _lyrics[index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
+                              if (line.timestamp > Duration.zero) {
+                                _audioService.seek(line.timestamp);
+                              }
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              child: Text(
+                                line.text.isEmpty ? '♪' : line.text,
+                                style: const TextStyle(
+                                  color: Color(0xFFD6DBE4),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.5,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  }
+
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       final halfHeight = constraints.maxHeight / 2;
@@ -1022,7 +1081,7 @@ class _PlayerScreenState extends State<PlayerScreen>
                               Colors.black,
                               Colors.transparent,
                             ],
-                            stops: [0.0, 0.35, 0.65, 1.0],
+                            stops: [0.0, 0.15, 0.85, 1.0],
                           ).createShader(bounds);
                         },
                         blendMode: BlendMode.dstIn,
@@ -1082,14 +1141,13 @@ class _PlayerScreenState extends State<PlayerScreen>
                                                 style: TextStyle(
                                                   color: isCurrent
                                                       ? AppTheme.accentLime
-                                                      : AppTheme.textSecondary
-                                                            .withValues(
-                                                              alpha: 0.25,
-                                                            ),
-                                                  fontSize: isCurrent ? 22 : 16,
+                                                      : const Color(0xFFADB5C4).withValues(
+                                                          alpha: 0.72,
+                                                        ),
+                                                  fontSize: isCurrent ? 22 : 17,
                                                   fontWeight: isCurrent
                                                       ? FontWeight.bold
-                                                      : FontWeight.w500,
+                                                      : FontWeight.w600,
                                                   letterSpacing: -0.3,
                                                 ),
                                                 child: Text(
