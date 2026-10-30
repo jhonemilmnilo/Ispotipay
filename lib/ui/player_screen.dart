@@ -991,6 +991,73 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
 
                   return Column(
                     children: [
+                      // Track Info & Favorite Heart Toggle Row (Above Progress Bar)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _activeTrack?.title ?? widget.track.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    _activeTrack?.artist ?? widget.track.artist,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: AppTheme.textSecondary,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                _isFavorite ? Icons.favorite : Icons.favorite_border,
+                                color: _isFavorite ? Colors.redAccent : AppTheme.textPrimary,
+                                size: 26,
+                              ),
+                              tooltip: _isFavorite ? 'In Favorites' : 'Add to Favorites',
+                              onPressed: () async {
+                                if (_activeTrack != null) {
+                                  final isFav = await _dbService.toggleFavorite(_activeTrack!);
+                                  if (!context.mounted) return;
+                                  setState(() {
+                                    _isFavorite = isFav;
+                                  });
+                                  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        isFav
+                                            ? 'Added to Favorites'
+                                            : 'Removed from Favorites',
+                                      ),
+                                      duration: const Duration(seconds: 1),
+                                    ),
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       StreamBuilder<Duration>(
                         stream: _audioService.positionStream,
                         builder: (context, posSnap) {
@@ -1206,33 +1273,6 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                   );
                                 },
                               );
-                            },
-                          ),
-
-                          // Favorite Heart Toggle Button
-                          IconButton(
-                            icon: Icon(
-                              _isFavorite ? Icons.favorite : Icons.favorite_border,
-                              color: _isFavorite ? Colors.redAccent : AppTheme.textPrimary,
-                              size: 24,
-                            ),
-                            tooltip: 'Favorite',
-                            onPressed: () async {
-                              if (_activeTrack != null) {
-                                final isFav = await _dbService.toggleFavorite(_activeTrack!);
-                                if (!context.mounted) return;
-                                setState(() {
-                                  _isFavorite = isFav;
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(isFav
-                                        ? 'Added to Favorites'
-                                        : 'Removed from Favorites'),
-                                    duration: const Duration(seconds: 1),
-                                  ),
-                                );
-                              }
                             },
                           ),
                         ],
