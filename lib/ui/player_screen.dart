@@ -592,22 +592,51 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                             parent: AlwaysScrollableScrollPhysics(),
                                           ),
                                           children: [
-                                            // 1. Finished History Items (at the top)
-                                            for (int i = 0; i < liveHistory.length; i++)
-                                              _buildUnifiedQueueItem(
-                                                ctx: ctx,
-                                                track: liveHistory[i],
-                                                isPlaying: false,
-                                                isHistory: true,
-                                                listIndex: i,
-                                              ),
+                                            // 1. Finished History Items (at the top, strict unique IDs)
+                                            Builder(
+                                              builder: (context) {
+                                                final renderedHistoryIds = <String>{};
+                                                final uniqueHistory = <Track>[];
+                                                for (final h in liveHistory) {
+                                                  if (h.id != liveCurrent?.id && !renderedHistoryIds.contains(h.id)) {
+                                                    renderedHistoryIds.add(h.id);
+                                                    uniqueHistory.add(h);
+                                                  }
+                                                }
+
+                                                return Column(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    for (int i = 0; i < uniqueHistory.length; i++)
+                                                      _buildUnifiedQueueItem(
+                                                        ctx: ctx,
+                                                        track: uniqueHistory[i],
+                                                        isPlaying: false,
+                                                        isHistory: true,
+                                                        listIndex: i,
+                                                      ),
+                                                  ],
+                                                );
+                                              },
+                                            ),
 
                                             // 2. Unified Draggable Active Timeline: [Currently Playing + Upcoming Queue]
                                             Builder(
                                               builder: (context) {
                                                 final activeList = <Track>[];
                                                 if (liveCurrent != null) activeList.add(liveCurrent);
-                                                activeList.addAll(liveQueue);
+
+                                                // Exclude history items and currently playing track from upcoming queue to guarantee no duplicates
+                                                final historyIdSet = liveHistory.map((t) => t.id).toSet();
+                                                final seenQueueIds = <String>{};
+                                                if (liveCurrent != null) seenQueueIds.add(liveCurrent.id);
+
+                                                for (final t in liveQueue) {
+                                                  if (!historyIdSet.contains(t.id) && !seenQueueIds.contains(t.id)) {
+                                                    seenQueueIds.add(t.id);
+                                                    activeList.add(t);
+                                                  }
+                                                }
 
                                                 if (activeList.isEmpty) return const SizedBox.shrink();
 
