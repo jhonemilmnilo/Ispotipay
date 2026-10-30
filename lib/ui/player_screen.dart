@@ -283,6 +283,19 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                    const SizedBox(width: 4),
+                    // Drag handle for Current Playing Song!
+                    ReorderableDragStartListener(
+                      index: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        child: const Icon(
+                          Icons.drag_handle_rounded,
+                          color: AppTheme.accentLime,
+                          size: 22,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               );
@@ -368,11 +381,35 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
           fontSize: 12,
         ),
       ),
-      trailing: Icon(
-        isHistory ? Icons.replay_rounded : Icons.play_arrow_rounded,
-        color: AppTheme.textSecondary,
-        size: 22,
-      ),
+      trailing: isHistory
+          ? const Icon(
+              Icons.replay_rounded,
+              color: AppTheme.textSecondary,
+              size: 22,
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.play_arrow_rounded,
+                  color: AppTheme.textSecondary,
+                  size: 22,
+                ),
+                const SizedBox(width: 4),
+                // Drag handle for reordering queue (relative to active timeline where 0 is currently playing)
+                ReorderableDragStartListener(
+                  index: listIndex - _historyTracks.length,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    child: const Icon(
+                      Icons.drag_handle_rounded,
+                      color: AppTheme.textSecondary,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
       onTap: () {
         Navigator.pop(ctx);
         if (isHistory) {
@@ -480,7 +517,7 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                   ),
                   const Divider(color: AppTheme.divider, height: 24),
 
-                  // Unified Timeline Queue List: [Previous/History, Currently Playing, Upcoming Next]
+                  // Unified Timeline Queue List: [Previous/History, Currently Playing, Upcoming Next with Drag & Drop]
                   Expanded(
                     child: _isLoadingUpNext
                         ? _buildUpNextShimmerList()
@@ -492,76 +529,85 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                               }
                               return false;
                             },
-                            child: Builder(
-                              builder: (context) {
-                                final totalHistory = _historyTracks.length;
-                                final hasCurrent = _activeTrack != null;
-                                final totalUpcoming = _upNextTracks.length;
-                                final totalItems = totalHistory +
-                                    (hasCurrent ? 1 : 0) +
-                                    totalUpcoming +
-                                    (_isLoadingMoreUpNext ? 2 : 0);
-
-                                if (totalItems == 0) {
-                                  return const Center(
-                                    child: Text(
-                                      'Queue is empty',
-                                      style: TextStyle(color: AppTheme.textSecondary),
-                                    ),
-                                  );
-                                }
-
-                                return ListView.builder(
-                                  controller: scrollController,
-                                  physics: const BouncingScrollPhysics(
-                                    parent: AlwaysScrollableScrollPhysics(),
+                            child: ListView(
+                              controller: scrollController,
+                              physics: const BouncingScrollPhysics(
+                                parent: AlwaysScrollableScrollPhysics(),
+                              ),
+                              children: [
+                                // 1. Finished History Items (at the top)
+                                for (int i = 0; i < _historyTracks.length; i++)
+                                  _buildUnifiedQueueItem(
+                                    ctx: ctx,
+                                    track: _historyTracks[i],
+                                    isPlaying: false,
+                                    isHistory: true,
+                                    listIndex: i,
                                   ),
-                                  itemCount: totalItems,
-                                  itemBuilder: (context, index) {
-                                    // 1. Finished History Items (at the top)
-                                    if (index < totalHistory) {
-                                      final track = _historyTracks[index];
-                                      return _buildUnifiedQueueItem(
-                                        ctx: ctx,
-                                        track: track,
-                                        isPlaying: false,
-                                        isHistory: true,
-                                        listIndex: index,
-                                      );
-                                    }
 
-                                    // 2. Currently Playing Item (in the natural middle timeline)
-                                    final currentIndex = totalHistory;
-                                    if (hasCurrent && index == currentIndex) {
-                                      return _buildUnifiedQueueItem(
-                                        ctx: ctx,
-                                        track: _activeTrack!,
-                                        isPlaying: true,
-                                        isHistory: false,
-                                        listIndex: index,
-                                      );
-                                    }
+                                // 2. Unified Draggable Active Timeline: [Currently Playing + Upcoming Queue]
+                                Builder(
+                                  builder: (context) {
+                                    final activeList = <Track>[];
+                                    if (_activeTrack != null) activeList.add(_activeTrack!);
+                                    activeList.addAll(_upNextTracks);
 
-                                    // 3. Shimmer loading footer when paginating
-                                    final upcomingStartIndex = hasCurrent ? currentIndex + 1 : currentIndex;
-                                    final upcomingItemIndex = index - upcomingStartIndex;
+                                    if (activeList.isEmpty) return const SizedBox.shrink();
 
-                                    if (upcomingItemIndex >= totalUpcoming) {
-                                      return _buildShimmerQueueTile();
-                                    }
+                                    return ReorderableListView.builder(
+                                      shrinkWrap: true,
+                                      physics: const NeverScrollableScrollPhysics(),
+                                      buildDefaultDragHandles: false,
+                                      itemCount: activeList.length,
+                                      onReorderItem: (oldIdx, newIdx) async {
+                                        setState(() {
+                                          final moved = activeList.removeAt(oldIdx);
+                                          activeList.insert(newIdx, moved);
+                                          _activeTrack = activeList.first;
+                                          _upNextTracks = activeList.sublist(1);
+                                        });
 
-                                    // 4. Upcoming Up Next items (below currently playing)
-                                    final track = _upNextTracks[upcomingItemIndex];
-                                    return _buildUnifiedQueueItem(
-                                      ctx: ctx,
-                                      track: track,
-                                      isPlaying: false,
-                                      isHistory: false,
-                                      listIndex: index,
+                                        await _audioService.reorderActiveTimeline(oldIdx, newIdx);
+                                      },
+                                      itemBuilder: (context, activeIdx) {
+                                        final track = activeList[activeIdx];
+                                        final isCurrent = activeIdx == 0 && _activeTrack != null;
+                                        final overallIndex = _historyTracks.length + activeIdx;
+
+                                        return Container(
+                                          key: ValueKey('active_${track.id}_$activeIdx'),
+                                          child: _buildUnifiedQueueItem(
+                                            ctx: ctx,
+                                            track: track,
+                                            isPlaying: isCurrent,
+                                            isHistory: false,
+                                            listIndex: overallIndex,
+                                          ),
+                                        );
+                                      },
                                     );
                                   },
-                                );
-                              },
+                                ),
+
+                                // 4. Shimmer loading footer when paginating
+                                if (_isLoadingMoreUpNext) ...[
+                                  _buildShimmerQueueTile(),
+                                  _buildShimmerQueueTile(),
+                                ],
+
+                                if (_historyTracks.isEmpty &&
+                                    _activeTrack == null &&
+                                    _upNextTracks.isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 40),
+                                    child: Center(
+                                      child: Text(
+                                        'Queue is empty',
+                                        style: TextStyle(color: AppTheme.textSecondary),
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                   ),

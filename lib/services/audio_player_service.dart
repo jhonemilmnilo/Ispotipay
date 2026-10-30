@@ -140,6 +140,58 @@ class AudioPlayerService {
     await _executePlay(selectedTrack);
   }
 
+  /// Reorder items in the upcoming queue via drag and drop
+  void reorderQueue(int oldIndex, int newIndex) {
+    if (oldIndex < 0 || oldIndex >= _queue.length) return;
+    if (newIndex < 0) newIndex = 0;
+    if (newIndex > _queue.length) newIndex = _queue.length;
+
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+
+    final item = _queue.removeAt(oldIndex);
+    _queue.insert(newIndex, item);
+    _queueController.add(_queue);
+
+    // Warm up newly rearranged top upcoming tracks immediately
+    _prefetchUpcomingUrls();
+  }
+
+  /// Reorder active list where Index 0 is Current Playing, and Index 1..N is Upcoming Queue.
+  /// If another track is dragged to Index 0, it plays immediately!
+  /// If Current Playing is dragged to index > 0, the new top track plays immediately.
+  Future<void> reorderActiveTimeline(int oldIndex, int newIndex) async {
+    final activeList = <Track>[];
+    if (_currentTrack != null) activeList.add(_currentTrack!);
+    activeList.addAll(_queue);
+
+    if (oldIndex < 0 || oldIndex >= activeList.length) return;
+    if (newIndex < 0) newIndex = 0;
+    if (newIndex > activeList.length) newIndex = activeList.length;
+
+    if (oldIndex < newIndex) {
+      newIndex -= 1;
+    }
+
+    final movedTrack = activeList.removeAt(oldIndex);
+    activeList.insert(newIndex, movedTrack);
+
+    final newCurrent = activeList.first;
+    final newUpcoming = activeList.sublist(1);
+
+    _queue.clear();
+    _queue.addAll(newUpcoming);
+    _queueController.add(_queue);
+
+    if (newCurrent.id != _currentTrack?.id) {
+      // Switched current playing song via drag and drop!
+      await _executePlay(newCurrent, addToHistory: false);
+    } else {
+      _prefetchUpcomingUrls();
+    }
+  }
+
   /// Play a track directly
   Future<void> playTrack(Track track, {List<Track>? initialQueue}) async {
     if (initialQueue != null) {
