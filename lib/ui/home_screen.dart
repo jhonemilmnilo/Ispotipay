@@ -501,6 +501,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                               width: 90,
                                               height: 90,
                                               fit: BoxFit.cover,
+                                              cacheWidth: 180,
+                                              cacheHeight: 180,
                                               errorBuilder: (context, error, stackTrace) => Container(
                                                 width: 90,
                                                 height: 90,
@@ -730,6 +732,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           return _buildSongListTile(track);
                         },
                         childCount: _allMusic.length,
+                        addAutomaticKeepAlives: false,
+                        addRepaintBoundaries: true,
                       ),
                     ),
               if (_isLoadingMoreAll)
@@ -895,6 +899,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           ? Image.network(
                               track.thumbnailUrl!,
                               fit: BoxFit.cover,
+                              cacheWidth: 280,
+                              cacheHeight: 280,
                               frameBuilder: (context, child, frame, wasSync) {
                                 if (wasSync || frame != null) return child;
                                 return _buildFallbackThumbnail(
@@ -1028,6 +1034,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           ? Image.network(
                               track.thumbnailUrl!,
                               fit: BoxFit.cover,
+                              cacheWidth: 280,
+                              cacheHeight: 280,
                               frameBuilder: (context, child, frame, wasSync) {
                                 if (wasSync || frame != null) return child;
                                 return _buildFallbackThumbnail(
@@ -1135,6 +1143,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           ? Image.network(
                               playlist.thumbnailUrl!,
                               fit: BoxFit.cover,
+                              cacheWidth: 260,
+                              cacheHeight: 260,
                               errorBuilder: (_, _, _) => _buildFallbackThumbnail(),
                             )
                           : _buildFallbackThumbnail(),
@@ -1288,6 +1298,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 width: 48,
                 height: 48,
                 fit: BoxFit.cover,
+                cacheWidth: 96,
+                cacheHeight: 96,
                 frameBuilder: (context, child, frame, wasSync) {
                   if (wasSync || frame != null) return child;
                   return _buildFallbackThumbnail(

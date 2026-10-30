@@ -305,6 +305,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
                 width: 48,
                 height: 48,
                 fit: BoxFit.cover,
+                cacheWidth: 96,
+                cacheHeight: 96,
               )
             : Container(width: 48, height: 48, color: AppTheme.surfaceLight),
       ),
