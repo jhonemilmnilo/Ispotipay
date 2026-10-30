@@ -158,36 +158,41 @@ class AudioPlayerService {
     _prefetchUpcomingUrls();
   }
 
-  /// Reorder active list where Index 0 is Current Playing, and Index 1..N is Upcoming Queue.
-  /// If another track is dragged to Index 0, it plays immediately!
-  /// If Current Playing is dragged to index > 0, the new top track plays immediately.
-  Future<void> reorderActiveTimeline(int oldIndex, int newIndex) async {
+  /// Reorder active timeline without interrupting current playback!
+  /// The currently playing track keeps playing without stopping.
+  /// Songs placed ABOVE it become prior tracks, and songs placed BELOW it become the upcoming queue.
+  void reorderActiveTimeline(int oldIndex, int newIndex) {
+    if (_currentTrack == null) return;
+
     final activeList = <Track>[];
-    if (_currentTrack != null) activeList.add(_currentTrack!);
+    activeList.add(_currentTrack!);
     activeList.addAll(_queue);
 
     if (oldIndex < 0 || oldIndex >= activeList.length) return;
     if (newIndex < 0) newIndex = 0;
     if (newIndex > activeList.length) newIndex = activeList.length;
 
-    if (oldIndex < newIndex) {
-      newIndex -= 1;
-    }
-
     final movedTrack = activeList.removeAt(oldIndex);
     activeList.insert(newIndex, movedTrack);
 
-    final newCurrent = activeList.first;
-    final newUpcoming = activeList.sublist(1);
+    // Locate where _currentTrack is now positioned
+    final currentPos = activeList.indexWhere((t) => t.id == _currentTrack!.id);
 
-    _queue.clear();
-    _queue.addAll(newUpcoming);
-    _queueController.add(_queue);
+    if (currentPos != -1) {
+      // Everything before currentPos becomes part of playback history
+      final priorTracks = activeList.sublist(0, currentPos);
+      if (priorTracks.isNotEmpty) {
+        _playbackHistory.addAll(priorTracks);
+        _historyController.add(_playbackHistory);
+      }
 
-    if (newCurrent.id != _currentTrack?.id) {
-      // Switched current playing song via drag and drop!
-      await _executePlay(newCurrent, addToHistory: false);
-    } else {
+      // Everything after currentPos becomes the new upcoming queue
+      final subsequentTracks = activeList.sublist(currentPos + 1);
+      _queue.clear();
+      _queue.addAll(subsequentTracks);
+      _queueController.add(_queue);
+
+      // Pre-warm the new top tracks in the queue
       _prefetchUpcomingUrls();
     }
   }

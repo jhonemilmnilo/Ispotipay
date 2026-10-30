@@ -559,19 +559,24 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
                                       physics: const NeverScrollableScrollPhysics(),
                                       buildDefaultDragHandles: false,
                                       itemCount: activeList.length,
-                                      onReorderItem: (oldIdx, newIdx) async {
+                                      onReorderItem: (oldIdx, newIdx) {
                                         setState(() {
                                           final moved = activeList.removeAt(oldIdx);
                                           activeList.insert(newIdx, moved);
-                                          _activeTrack = activeList.first;
-                                          _upNextTracks = activeList.sublist(1);
+                                          // Keep _activeTrack pointing to currently playing song
+                                          final currentPos = activeList.indexWhere(
+                                            (t) => t.id == _activeTrack?.id,
+                                          );
+                                          if (currentPos != -1) {
+                                            _upNextTracks = activeList.sublist(currentPos + 1);
+                                          }
                                         });
 
-                                        await _audioService.reorderActiveTimeline(oldIdx, newIdx);
+                                        _audioService.reorderActiveTimeline(oldIdx, newIdx);
                                       },
                                       itemBuilder: (context, activeIdx) {
                                         final track = activeList[activeIdx];
-                                        final isCurrent = activeIdx == 0 && _activeTrack != null;
+                                        final isCurrent = track.id == _activeTrack?.id;
                                         final overallIndex = _historyTracks.length + activeIdx;
 
                                         return Container(
