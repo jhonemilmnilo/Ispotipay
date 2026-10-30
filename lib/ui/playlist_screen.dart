@@ -11,8 +11,15 @@ import 'player_screen.dart';
 
 class PlaylistScreen extends StatefulWidget {
   final Playlist playlist;
+  final bool isLocalFavorites;
+  final bool isLocalDownloads;
 
-  const PlaylistScreen({super.key, required this.playlist});
+  const PlaylistScreen({
+    super.key,
+    required this.playlist,
+    this.isLocalFavorites = false,
+    this.isLocalDownloads = false,
+  });
 
   @override
   State<PlaylistScreen> createState() => _PlaylistScreenState();
@@ -57,6 +64,30 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
   }
 
   Future<void> _loadInitialTracks() async {
+    if (widget.isLocalFavorites) {
+      final favs = await _dbService.getFavorites(limit: 50, offset: 0);
+      if (mounted) {
+        setState(() {
+          _tracks.addAll(favs);
+          _isLoading = false;
+          _offset = favs.length;
+        });
+      }
+      return;
+    }
+
+    if (widget.isLocalDownloads) {
+      final downloads = await _dbService.getDownloadedTracks(limit: 50, offset: 0);
+      if (mounted) {
+        setState(() {
+          _tracks.addAll(downloads);
+          _isLoading = false;
+          _offset = downloads.length;
+        });
+      }
+      return;
+    }
+
     final results = await _exploreService.searchTracks(widget.playlist.searchQuery, limit: 25);
     if (mounted) {
       setState(() {
@@ -81,6 +112,36 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
   }
 
   Future<void> _loadMoreTracks() async {
+    if (widget.isLocalFavorites) {
+      setState(() {
+        _isLoadingMore = true;
+      });
+      final favs = await _dbService.getFavorites(limit: 25, offset: _offset);
+      if (mounted) {
+        setState(() {
+          _tracks.addAll(favs);
+          _offset += favs.length;
+          _isLoadingMore = false;
+        });
+      }
+      return;
+    }
+
+    if (widget.isLocalDownloads) {
+      setState(() {
+        _isLoadingMore = true;
+      });
+      final downloads = await _dbService.getDownloadedTracks(limit: 25, offset: _offset);
+      if (mounted) {
+        setState(() {
+          _tracks.addAll(downloads);
+          _offset += downloads.length;
+          _isLoadingMore = false;
+        });
+      }
+      return;
+    }
+
     setState(() {
       _isLoadingMore = true;
     });

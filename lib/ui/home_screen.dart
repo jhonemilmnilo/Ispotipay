@@ -35,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   final List<Playlist> _artistAlbums = [];
   List<Track> _recents = [];
   List<Track> _favorites = [];
+  List<Track> _downloads = [];
   List<Track> _mostPlayed = [];
   final List<Track> _allMusic = [];
 
@@ -173,12 +174,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Future<void> _loadLocalLibrary() async {
     final recents = await _dbService.getRecents(limit: 15);
     final favs = await _dbService.getFavorites(limit: 25);
+    final downloads = await _dbService.getDownloadedTracks(limit: 50);
     final mostPlayed = await _dbService.getMostPlayed(limit: 10);
 
     if (mounted) {
       setState(() {
         _recents = recents;
         _favorites = favs;
+        _downloads = downloads;
         _mostPlayed = mostPlayed;
       });
     }
@@ -270,27 +273,143 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    RichText(
-                      text: const TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'IsPo',
-                            style: TextStyle(
-                              color: AppTheme.textPrimary,
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
-                            ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        RichText(
+                          text: const TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'IsPo',
+                                style: TextStyle(
+                                  color: AppTheme.textPrimary,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              TextSpan(
+                                text: 'TiPay',
+                                style: TextStyle(
+                                  color: AppTheme.accentLime,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
-                          TextSpan(
-                            text: 'TiPay',
-                            style: TextStyle(
-                              color: AppTheme.accentLime,
-                              fontSize: 26,
-                              fontWeight: FontWeight.bold,
+                        ),
+
+                        // Top Bar Action Pills: Favorites & Downloads
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Favorites Pill Button
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PlaylistScreen(
+                                      playlist: Playlist(
+                                        id: 'local_favorites',
+                                        title: 'Liked Songs & Favorites',
+                                        description: 'Your saved favorite tracks',
+                                        searchQuery: '',
+                                      ),
+                                      isLocalFavorites: true,
+                                    ),
+                                  ),
+                                ).then((_) => _loadLocalLibrary());
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surface,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: _favorites.isNotEmpty
+                                        ? Colors.redAccent.withValues(alpha: 0.5)
+                                        : AppTheme.divider,
+                                    width: 1.1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _favorites.isNotEmpty ? Icons.favorite : Icons.favorite_border,
+                                      color: _favorites.isNotEmpty ? Colors.redAccent : AppTheme.textSecondary,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      '${_favorites.length}',
+                                      style: TextStyle(
+                                        color: _favorites.isNotEmpty ? AppTheme.textPrimary : AppTheme.textSecondary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 8),
+
+                            // Downloads Pill Button
+                            GestureDetector(
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const PlaylistScreen(
+                                      playlist: Playlist(
+                                        id: 'local_downloads',
+                                        title: 'Downloaded Songs',
+                                        description: 'Offline audio with synced lyrics',
+                                        searchQuery: '',
+                                      ),
+                                      isLocalDownloads: true,
+                                    ),
+                                  ),
+                                ).then((_) => _loadLocalLibrary());
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.surface,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: _downloads.isNotEmpty
+                                        ? AppTheme.accentLime.withValues(alpha: 0.5)
+                                        : AppTheme.divider,
+                                    width: 1.1,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      _downloads.isNotEmpty ? Icons.download_done_rounded : Icons.download_rounded,
+                                      color: _downloads.isNotEmpty ? AppTheme.accentLime : AppTheme.textSecondary,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      '${_downloads.length}',
+                                      style: TextStyle(
+                                        color: _downloads.isNotEmpty ? AppTheme.textPrimary : AppTheme.textSecondary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     _buildSearchBar(),
