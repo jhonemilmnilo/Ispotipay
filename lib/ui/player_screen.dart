@@ -148,163 +148,200 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
     required bool isHistory,
     required int listIndex,
   }) {
-    if (isPlaying) {
-      // Live Track: Centerpiece with rotating circular progress border around thumbnail!
-      return StreamBuilder<Duration>(
-        stream: _audioService.positionStream,
-        builder: (context, posSnap) {
-          final pos = posSnap.data ?? Duration.zero;
-          return StreamBuilder<Duration?>(
-            stream: _audioService.durationStream,
-            builder: (context, durSnap) {
-              final dur = durSnap.data ?? Duration.zero;
-              final double progress = dur.inMilliseconds > 0
-                  ? (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0)
-                  : 0.0;
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 380),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SizeTransition(
+            sizeFactor: animation,
+            alignment: Alignment.center,
+            child: child,
+          ),
+        );
+      },
+      child: isPlaying
+          ? KeyedSubtree(
+              key: ValueKey('playing_${track.id}'),
+              child: _buildPlayingItem(track),
+            )
+          : KeyedSubtree(
+              key: ValueKey('standard_${track.id}_$isHistory'),
+              child: _buildStandardQueueTile(
+                ctx: ctx,
+                track: track,
+                isHistory: isHistory,
+                listIndex: listIndex,
+              ),
+            ),
+    );
+  }
 
-              return Container(
-                margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppTheme.primary.withValues(alpha: 0.28),
-                      const Color(0xFF0F1829),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppTheme.accentLime.withValues(alpha: 0.45),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppTheme.accentLime.withValues(alpha: 0.08),
-                      blurRadius: 12,
-                      offset: const Offset(0, 2),
-                    ),
+  Widget _buildPlayingItem(Track track) {
+    // Live Track: Centerpiece with rotating circular progress border around thumbnail!
+    return StreamBuilder<Duration>(
+      stream: _audioService.positionStream,
+      builder: (context, posSnap) {
+        final pos = posSnap.data ?? Duration.zero;
+        return StreamBuilder<Duration?>(
+          stream: _audioService.durationStream,
+          builder: (context, durSnap) {
+            final dur = durSnap.data ?? Duration.zero;
+            final double progress = dur.inMilliseconds > 0
+                ? (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0)
+                : 0.0;
+
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppTheme.primary.withValues(alpha: 0.28),
+                    const Color(0xFF0F1829),
                   ],
                 ),
-                child: Row(
-                  children: [
-                    // Circular Progress Rotating Border wrapping the thumbnail
-                    SizedBox(
-                      width: 52,
-                      height: 52,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            value: progress,
-                            strokeWidth: 2.8,
-                            backgroundColor: AppTheme.surfaceLight.withValues(alpha: 0.3),
-                            color: AppTheme.accentLime,
-                          ),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(22),
-                            child: track.thumbnailUrl != null
-                                ? Image.network(
-                                    track.thumbnailUrl!,
-                                    width: 42,
-                                    height: 42,
-                                    fit: BoxFit.cover,
-                                    frameBuilder: (context, child, frame, wasSync) {
-                                      if (wasSync || frame != null) return child;
-                                      return _buildCustomThumbnail(
-                                        title: track.title,
-                                        artist: track.artist,
-                                        size: 42,
-                                      );
-                                    },
-                                    errorBuilder: (_, _, _) => _buildCustomThumbnail(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppTheme.accentLime.withValues(alpha: 0.45),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.accentLime.withValues(alpha: 0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // Circular Progress Rotating Border wrapping the thumbnail
+                  SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          value: progress,
+                          strokeWidth: 2.8,
+                          backgroundColor: AppTheme.surfaceLight.withValues(alpha: 0.3),
+                          color: AppTheme.accentLime,
+                        ),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(22),
+                          child: track.thumbnailUrl != null
+                              ? Image.network(
+                                  track.thumbnailUrl!,
+                                  width: 42,
+                                  height: 42,
+                                  fit: BoxFit.cover,
+                                  frameBuilder: (context, child, frame, wasSync) {
+                                    if (wasSync || frame != null) return child;
+                                    return _buildCustomThumbnail(
                                       title: track.title,
                                       artist: track.artist,
                                       size: 42,
-                                    ),
-                                  )
-                                : _buildCustomThumbnail(
+                                    );
+                                  },
+                                  errorBuilder: (_, _, _) => _buildCustomThumbnail(
                                     title: track.title,
                                     artist: track.artist,
                                     size: 42,
                                   ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: const [
-                              Icon(Icons.graphic_eq, color: AppTheme.accentLime, size: 14),
-                              SizedBox(width: 4),
-                              Text(
-                                'PLAYING NOW',
-                                style: TextStyle(
-                                  color: AppTheme.accentLime,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 0.6,
+                                )
+                              : _buildCustomThumbnail(
+                                  title: track.title,
+                                  artist: track.artist,
+                                  size: 42,
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            track.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppTheme.textPrimary,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            track.artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppTheme.textSecondary,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      _formatDuration(pos),
-                      style: const TextStyle(
-                        color: AppTheme.accentLime,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    // Drag handle for Current Playing Song!
-                    ReorderableDragStartListener(
-                      index: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        child: const Icon(
-                          Icons.drag_handle_rounded,
-                          color: AppTheme.accentLime,
-                          size: 22,
                         ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.graphic_eq, color: AppTheme.accentLime, size: 14),
+                            SizedBox(width: 4),
+                            Text(
+                              'PLAYING NOW',
+                              style: TextStyle(
+                                color: AppTheme.accentLime,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          track.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          track.artist,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    _formatDuration(pos),
+                    style: const TextStyle(
+                      color: AppTheme.accentLime,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // Drag handle for Current Playing Song!
+                  ReorderableDragStartListener(
+                    index: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      child: const Icon(
+                        Icons.drag_handle_rounded,
+                        color: AppTheme.accentLime,
+                        size: 22,
                       ),
                     ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
-      );
-    }
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
+  Widget _buildStandardQueueTile({
+    required BuildContext ctx,
+    required Track track,
+    required bool isHistory,
+    required int listIndex,
+  }) {
     // Finished History Song or Upcoming Queue Song
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
@@ -435,189 +472,201 @@ class _PlayerScreenState extends State<PlayerScreen> with SingleTickerProviderSt
         reverseDuration: const Duration(milliseconds: 260),
       ),
       builder: (ctx) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.65,
-          minChildSize: 0.35,
-          maxChildSize: 0.94,
-          snap: true,
-          snapSizes: const [0.35, 0.65, 0.94],
-          builder: (sheetContext, scrollController) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: Color(0xFF0A0F1D),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black87,
-                    blurRadius: 25,
-                    offset: Offset(0, -6),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  // YouTube Music Style Grab Handle Pill
-                  const SizedBox(height: 12),
-                  Center(
-                    child: Container(
-                      width: 44,
-                      height: 4.5,
-                      decoration: BoxDecoration(
-                        color: AppTheme.textSecondary.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+        return StreamBuilder<Track?>(
+          stream: _audioService.currentTrackStream,
+          initialData: _audioService.currentTrack ?? _activeTrack,
+          builder: (sheetCtx, trackSnap) {
+            final liveCurrent = trackSnap.data ?? _activeTrack;
 
-                  // Drawer Header
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Up Next',
-                              style: TextStyle(
-                                color: AppTheme.textPrimary,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Playing from: Radio • Similar to ${_activeTrack?.artist ?? ''}',
-                              style: const TextStyle(
-                                color: AppTheme.textSecondary,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppTheme.accentLime.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${_upNextTracks.length} tracks',
-                            style: const TextStyle(
-                              color: AppTheme.accentLime,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(color: AppTheme.divider, height: 24),
+            return StreamBuilder<List<Track>>(
+              stream: _audioService.historyStream,
+              initialData: _audioService.playbackHistory,
+              builder: (histCtx, histSnap) {
+                final liveHistory = histSnap.data ?? _historyTracks;
 
-                  // Unified Timeline Queue List: [Previous/History, Currently Playing, Upcoming Next with Drag & Drop]
-                  Expanded(
-                    child: _isLoadingUpNext
-                        ? _buildUpNextShimmerList()
-                        : NotificationListener<ScrollNotification>(
-                            onNotification: (ScrollNotification scrollInfo) {
-                              if (scrollInfo.metrics.pixels >=
-                                  scrollInfo.metrics.maxScrollExtent - 200) {
-                                _loadMoreUpNext();
-                              }
-                              return false;
-                            },
-                            child: ListView(
-                              controller: scrollController,
-                              physics: const BouncingScrollPhysics(
-                                parent: AlwaysScrollableScrollPhysics(),
+                return StreamBuilder<List<Track>>(
+                  stream: _audioService.queueStream,
+                  initialData: _audioService.queue,
+                  builder: (queueCtx, queueSnap) {
+                    final liveQueue = queueSnap.data ?? _upNextTracks;
+
+                    return DraggableScrollableSheet(
+                      initialChildSize: 0.65,
+                      minChildSize: 0.35,
+                      maxChildSize: 0.94,
+                      snap: true,
+                      snapSizes: const [0.35, 0.65, 0.94],
+                      builder: (sheetContext, scrollController) {
+                        return Container(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF0A0F1D),
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black87,
+                                blurRadius: 25,
+                                offset: Offset(0, -6),
                               ),
-                              children: [
-                                // 1. Finished History Items (at the top)
-                                for (int i = 0; i < _historyTracks.length; i++)
-                                  _buildUnifiedQueueItem(
-                                    ctx: ctx,
-                                    track: _historyTracks[i],
-                                    isPlaying: false,
-                                    isHistory: true,
-                                    listIndex: i,
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              // YouTube Music Style Grab Handle Pill
+                              const SizedBox(height: 12),
+                              Center(
+                                child: Container(
+                                  width: 44,
+                                  height: 4.5,
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.textSecondary.withValues(alpha: 0.35),
+                                    borderRadius: BorderRadius.circular(3),
                                   ),
-
-                                // 2. Unified Draggable Active Timeline: [Currently Playing + Upcoming Queue]
-                                Builder(
-                                  builder: (context) {
-                                    final activeList = <Track>[];
-                                    if (_activeTrack != null) activeList.add(_activeTrack!);
-                                    activeList.addAll(_upNextTracks);
-
-                                    if (activeList.isEmpty) return const SizedBox.shrink();
-
-                                    return ReorderableListView.builder(
-                                      shrinkWrap: true,
-                                      physics: const NeverScrollableScrollPhysics(),
-                                      buildDefaultDragHandles: false,
-                                      itemCount: activeList.length,
-                                      onReorderItem: (oldIdx, newIdx) {
-                                        setState(() {
-                                          final moved = activeList.removeAt(oldIdx);
-                                          activeList.insert(newIdx, moved);
-                                          // Keep _activeTrack pointing to currently playing song
-                                          final currentPos = activeList.indexWhere(
-                                            (t) => t.id == _activeTrack?.id,
-                                          );
-                                          if (currentPos != -1) {
-                                            _upNextTracks = activeList.sublist(currentPos + 1);
-                                          }
-                                        });
-
-                                        _audioService.reorderActiveTimeline(oldIdx, newIdx);
-                                      },
-                                      itemBuilder: (context, activeIdx) {
-                                        final track = activeList[activeIdx];
-                                        final isCurrent = track.id == _activeTrack?.id;
-                                        final overallIndex = _historyTracks.length + activeIdx;
-
-                                        return Container(
-                                          key: ValueKey('active_${track.id}_$activeIdx'),
-                                          child: _buildUnifiedQueueItem(
-                                            ctx: ctx,
-                                            track: track,
-                                            isPlaying: isCurrent,
-                                            isHistory: false,
-                                            listIndex: overallIndex,
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
                                 ),
+                              ),
+                              const SizedBox(height: 12),
 
-                                // 4. Shimmer loading footer when paginating
-                                if (_isLoadingMoreUpNext) ...[
-                                  _buildShimmerQueueTile(),
-                                  _buildShimmerQueueTile(),
-                                ],
-
-                                if (_historyTracks.isEmpty &&
-                                    _activeTrack == null &&
-                                    _upNextTracks.isEmpty)
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 40),
-                                    child: Center(
+                              // Drawer Header
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 20),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Up Next',
+                                          style: TextStyle(
+                                            color: AppTheme.textPrimary,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Playing from: Radio • Similar to ${liveCurrent?.artist ?? ''}',
+                                          style: const TextStyle(
+                                            color: AppTheme.textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.accentLime.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
                                       child: Text(
-                                        'Queue is empty',
-                                        style: TextStyle(color: AppTheme.textSecondary),
+                                        '${liveQueue.length} tracks',
+                                        style: const TextStyle(
+                                          color: AppTheme.accentLime,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                              ],
-                            ),
+                                  ],
+                                ),
+                              ),
+                              const Divider(color: AppTheme.divider, height: 24),
+
+                              // Unified Timeline Queue List: [Previous/History, Currently Playing, Upcoming Next with Drag & Drop]
+                              Expanded(
+                                child: _isLoadingUpNext
+                                    ? _buildUpNextShimmerList()
+                                    : NotificationListener<ScrollNotification>(
+                                        onNotification: (ScrollNotification scrollInfo) {
+                                          if (scrollInfo.metrics.pixels >=
+                                              scrollInfo.metrics.maxScrollExtent - 200) {
+                                            _loadMoreUpNext();
+                                          }
+                                          return false;
+                                        },
+                                        child: ListView(
+                                          controller: scrollController,
+                                          physics: const BouncingScrollPhysics(
+                                            parent: AlwaysScrollableScrollPhysics(),
+                                          ),
+                                          children: [
+                                            // 1. Finished History Items (at the top)
+                                            for (int i = 0; i < liveHistory.length; i++)
+                                              _buildUnifiedQueueItem(
+                                                ctx: ctx,
+                                                track: liveHistory[i],
+                                                isPlaying: false,
+                                                isHistory: true,
+                                                listIndex: i,
+                                              ),
+
+                                            // 2. Unified Draggable Active Timeline: [Currently Playing + Upcoming Queue]
+                                            Builder(
+                                              builder: (context) {
+                                                final activeList = <Track>[];
+                                                if (liveCurrent != null) activeList.add(liveCurrent);
+                                                activeList.addAll(liveQueue);
+
+                                                if (activeList.isEmpty) return const SizedBox.shrink();
+
+                                                return ReorderableListView.builder(
+                                                  shrinkWrap: true,
+                                                  physics: const NeverScrollableScrollPhysics(),
+                                                  buildDefaultDragHandles: false,
+                                                  itemCount: activeList.length,
+                                                  onReorderItem: (oldIdx, newIdx) {
+                                                    _audioService.reorderActiveTimeline(oldIdx, newIdx);
+                                                  },
+                                                  itemBuilder: (context, activeIdx) {
+                                                    final track = activeList[activeIdx];
+                                                    final isCurrent = track.id == liveCurrent?.id;
+                                                    final overallIndex = liveHistory.length + activeIdx;
+
+                                                    return Container(
+                                                      key: ValueKey('active_${track.id}_$activeIdx'),
+                                                      child: _buildUnifiedQueueItem(
+                                                        ctx: ctx,
+                                                        track: track,
+                                                        isPlaying: isCurrent,
+                                                        isHistory: false,
+                                                        listIndex: overallIndex,
+                                                      ),
+                                                    );
+                                                  },
+                                                );
+                                              },
+                                            ),
+
+                                            // 4. Shimmer loading footer when paginating
+                                            if (_isLoadingMoreUpNext) ...[
+                                              _buildShimmerQueueTile(),
+                                              _buildShimmerQueueTile(),
+                                            ],
+
+                                            if (liveHistory.isEmpty &&
+                                                liveCurrent == null &&
+                                                liveQueue.isEmpty)
+                                              const Padding(
+                                                padding: EdgeInsets.symmetric(vertical: 40),
+                                                child: Center(
+                                                  child: Text(
+                                                    'Queue is empty',
+                                                    style: TextStyle(color: AppTheme.textSecondary),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                              ),
+                            ],
                           ),
-                  ),
-                ],
-              ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
             );
           },
         );
