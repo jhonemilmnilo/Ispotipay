@@ -890,11 +890,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    avatar: const Icon(
-                      Icons.auto_awesome,
-                      color: AppTheme.accentLime,
-                      size: 13,
-                    ),
                     label: Text(
                       suggestion,
                       style: const TextStyle(

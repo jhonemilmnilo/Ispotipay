@@ -531,10 +531,14 @@ class MusicExploreService {
     return matchedPlaylists;
   }
 
-  /// Search tracks by lyrics content using LRCLIB search endpoint, then enrich with iTunes metadata
+  /// Search tracks by lyrics content using LRCLIB search endpoint with iTunes full-text fallback
   Future<List<Track>> searchTracksByLyrics(String lyricsQuery, {int limit = 15}) async {
     if (lyricsQuery.trim().isEmpty) return [];
 
+    final List<Track> lyricMatches = [];
+    final seenKeys = <String>{};
+
+    // 1. Primary: LRCLIB search endpoint for lyric phrase matches
     try {
       final encoded = Uri.encodeComponent(lyricsQuery.trim());
       final lrclibUrl = Uri.parse('https://lrclib.net/api/search?q=$encoded');
@@ -545,8 +549,6 @@ class MusicExploreService {
 
       if (response.statusCode == 200) {
         final results = json.decode(response.body) as List? ?? [];
-        final List<Track> lyricMatches = [];
-        final seenKeys = <String>{};
 
         for (final item in results) {
           final trackName = item['trackName'] as String? ?? '';
@@ -555,7 +557,6 @@ class MusicExploreService {
           final syncedLyrics = item['syncedLyrics'] as String?;
           final plainLyrics = item['plainLyrics'] as String?;
 
-          // Must have matching lyrics text
           final hasLyrics = (syncedLyrics != null && syncedLyrics.isNotEmpty) ||
               (plainLyrics != null && plainLyrics.isNotEmpty);
 
@@ -564,7 +565,6 @@ class MusicExploreService {
             if (!seenKeys.contains(key)) {
               seenKeys.add(key);
 
-              // Find high-res artwork & studio metadata via iTunes for this song
               final itunesCandidates = await searchTracks('$trackName $artistName', limit: 1);
               if (itunesCandidates.isNotEmpty) {
                 lyricMatches.add(itunesCandidates.first);
@@ -584,11 +584,25 @@ class MusicExploreService {
             }
           }
         }
-        return lyricMatches;
       }
     } catch (_) {}
 
-    return [];
+    // 2. Secondary: If LRCLIB is busy/503 or returned few matches, query iTunes full-text search
+    // Apple's search engine indexes lyrics and catchphrases (e.g. "would you wanna run away too" -> She Looks So Perfect)
+    if (lyricMatches.isEmpty) {
+      try {
+        final itunesFullText = await searchTracks(lyricsQuery, limit: limit);
+        for (final track in itunesFullText) {
+          final key = '${track.title.toLowerCase().trim()}_${track.artist.toLowerCase().trim()}';
+          if (!seenKeys.contains(key)) {
+            seenKeys.add(key);
+            lyricMatches.add(track);
+          }
+        }
+      } catch (_) {}
+    }
+
+    return lyricMatches;
   }
 
   /// Get live search suggestions/recommendations based on query or popular topics
