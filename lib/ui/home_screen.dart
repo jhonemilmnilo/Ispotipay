@@ -1532,16 +1532,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               }
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.play_circle_fill, color: AppTheme.accentLime, size: 28),
-            onPressed: () {
-              _playTrack(track);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => PlayerScreen(track: track)),
-              );
-            },
-          ),
         ],
       ),
     );
