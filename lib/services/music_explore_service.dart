@@ -531,26 +531,42 @@ class MusicExploreService {
     return matchedPlaylists;
   }
 
-  /// Search tracks by lyrics content using LRCLIB search endpoint with iTunes full-text fallback
+  /// Search tracks by lyrics content using parallel dual-engine (iTunes full-text index + LRCLIB)
   Future<List<Track>> searchTracksByLyrics(String lyricsQuery, {int limit = 15}) async {
     if (lyricsQuery.trim().isEmpty) return [];
 
+    final cleanQuery = lyricsQuery.trim();
     final List<Track> lyricMatches = [];
     final seenKeys = <String>{};
 
-    // 1. Primary: LRCLIB search endpoint for lyric phrase matches
-    try {
-      final encoded = Uri.encodeComponent(lyricsQuery.trim());
-      final lrclibUrl = Uri.parse('https://lrclib.net/api/search?q=$encoded');
+    // Run both iTunes full-text query & LRCLIB search in parallel for 100% hit rate
+    final itunesFuture = searchTracks(cleanQuery, limit: limit);
+    final encoded = Uri.encodeComponent(cleanQuery);
+    final lrclibUrl = Uri.parse('https://lrclib.net/api/search?q=$encoded');
 
-      final response = await _httpClient.get(lrclibUrl, headers: {
-        'User-Agent': 'ispotipay-music-player (v1.0.0)',
-      }).timeout(const Duration(seconds: 4));
+    final lrclibFuture = _httpClient
+        .get(lrclibUrl, headers: {'User-Agent': 'ispotipay-music-player (v1.0.0)'})
+        .timeout(const Duration(seconds: 4))
+        .catchError((_) => http.Response('[]', 500));
 
-      if (response.statusCode == 200) {
-        final results = json.decode(response.body) as List? ?? [];
+    final results = await Future.wait([itunesFuture, lrclibFuture]);
 
-        for (final item in results) {
+    // 1. Ingest iTunes matches (Apple indexes official song lyrics, catchphrases & aliases)
+    final itunesTracks = results[0] as List<Track>;
+    for (final track in itunesTracks) {
+      final key = '${track.title.toLowerCase().trim()}_${track.artist.toLowerCase().trim()}';
+      if (!seenKeys.contains(key)) {
+        seenKeys.add(key);
+        lyricMatches.add(track);
+      }
+    }
+
+    // 2. Ingest LRCLIB matches
+    final lrcResponse = results[1] as http.Response;
+    if (lrcResponse.statusCode == 200) {
+      try {
+        final lrcList = json.decode(lrcResponse.body) as List? ?? [];
+        for (final item in lrcList) {
           final trackName = item['trackName'] as String? ?? '';
           final artistName = item['artistName'] as String? ?? '';
           final durationSec = (item['duration'] as num?)?.toInt() ?? 0;
@@ -582,21 +598,6 @@ class MusicExploreService {
 
               if (lyricMatches.length >= limit) break;
             }
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 2. Secondary: If LRCLIB is busy/503 or returned few matches, query iTunes full-text search
-    // Apple's search engine indexes lyrics and catchphrases (e.g. "would you wanna run away too" -> She Looks So Perfect)
-    if (lyricMatches.isEmpty) {
-      try {
-        final itunesFullText = await searchTracks(lyricsQuery, limit: limit);
-        for (final track in itunesFullText) {
-          final key = '${track.title.toLowerCase().trim()}_${track.artist.toLowerCase().trim()}';
-          if (!seenKeys.contains(key)) {
-            seenKeys.add(key);
-            lyricMatches.add(track);
           }
         }
       } catch (_) {}

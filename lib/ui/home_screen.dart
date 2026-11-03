@@ -1432,16 +1432,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
       ),
       title: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Expanded(
             child: Text(
               track.title,
-              maxLines: 1,
+              maxLines: isLyricMatch ? 2 : 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
                 color: AppTheme.textPrimary,
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
+                height: 1.25,
               ),
             ),
           ),
