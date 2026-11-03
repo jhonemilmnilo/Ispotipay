@@ -49,7 +49,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   bool _isLoadingMoreAll = false;
   bool _isSearching = false;
   List<Track> _searchResults = [];
+  List<Track> _lyricResults = [];
   List<Playlist> _searchMatchedAlbums = [];
+  List<String> _suggestions = [];
+  final FocusNode _searchFocusNode = FocusNode();
   int _playlistOffset = 0;
   int _topMusicOffset = 0;
 
@@ -77,6 +80,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void dispose() {
     _debounceTimer?.cancel();
     _librarySubscription?.cancel();
+    _searchFocusNode.dispose();
     _searchController.dispose();
     _scrollController.dispose();
     _playlistScrollController.dispose();
@@ -248,29 +252,53 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       setState(() {
         _isSearching = false;
         _searchResults = [];
+        _lyricResults = [];
         _searchMatchedAlbums = [];
+        _suggestions = [];
       });
       return;
     }
 
-    // 400ms Debounce rule
+    // Instant query suggestions
+    setState(() {
+      _suggestions = _exploreService.getSearchSuggestions(query);
+    });
+
+    // 400ms Debounce rule for network search
     _debounceTimer = Timer(const Duration(milliseconds: 400), () async {
       final futures = await Future.wait([
         _exploreService.searchTracks(query),
         _exploreService.searchArtistsAndAlbums(query),
+        _exploreService.searchTracksByLyrics(query),
       ]);
 
       final tracks = futures[0] as List<Track>;
       final albums = futures[1] as List<Playlist>;
+      final lyricTracks = futures[2] as List<Track>;
+
+      // Deduplicate lyricTracks if already present in direct track results
+      final trackIds = tracks.map((t) => t.id).toSet();
+      final trackNames = tracks.map((t) => '${t.title.toLowerCase()}_${t.artist.toLowerCase()}').toSet();
+      final cleanLyricMatches = lyricTracks.where((lt) {
+        final key = '${lt.title.toLowerCase()}_${lt.artist.toLowerCase()}';
+        return !trackIds.contains(lt.id) && !trackNames.contains(key);
+      }).toList();
 
       if (mounted) {
         setState(() {
           _isSearching = true;
           _searchResults = tracks;
           _searchMatchedAlbums = albums;
+          _lyricResults = cleanLyricMatches;
         });
       }
     });
+  }
+
+  void _applySuggestion(String suggestion) {
+    _searchController.text = suggestion;
+    _searchFocusNode.unfocus();
+    _onSearchChanged(suggestion);
   }
 
   void _playTrack(Track track) async {
@@ -611,6 +639,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   childCount: _searchResults.length,
                 ),
               ),
+
+              // Matching Lyrics Section
+              if (_lyricResults.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+                    child: Row(
+                      children: const [
+                        Icon(Icons.lyrics_rounded, color: AppTheme.accentLime, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Matches In Lyrics',
+                          style: TextStyle(
+                            color: AppTheme.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final track = _lyricResults[index];
+                      return _buildSongListTile(track, isLyricMatch: true);
+                    },
+                    childCount: _lyricResults.length,
+                  ),
+                ),
+              ],
             ] else ...[
               // 2. Top Music Section (Horizontal Carousel with Infinite Scroll)
               SliverToBoxAdapter(
@@ -780,33 +840,77 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildSearchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.divider),
-      ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: _onSearchChanged,
-        style: const TextStyle(color: AppTheme.textPrimary),
-        decoration: InputDecoration(
-          hintText: 'Search songs, artists, albums...',
-          hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-          prefixIcon: const Icon(Icons.search, color: AppTheme.accentLime),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(Icons.clear, color: AppTheme.textSecondary, size: 18),
-                  onPressed: () {
-                    _searchController.clear();
-                    _onSearchChanged('');
-                  },
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.divider),
+          ),
+          child: TextField(
+            controller: _searchController,
+            focusNode: _searchFocusNode,
+            onChanged: _onSearchChanged,
+            style: const TextStyle(color: AppTheme.textPrimary),
+            decoration: InputDecoration(
+              hintText: 'Search songs, lyrics, artists, albums...',
+              hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+              prefixIcon: const Icon(Icons.search, color: AppTheme.accentLime),
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: AppTheme.textSecondary, size: 18),
+                      onPressed: () {
+                        _searchController.clear();
+                        _onSearchChanged('');
+                      },
+                    )
+                  : null,
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            ),
+          ),
         ),
-      ),
+        if (_suggestions.isNotEmpty && _searchController.text.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _suggestions.map((suggestion) {
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ActionChip(
+                    backgroundColor: AppTheme.surfaceLight,
+                    side: BorderSide(
+                      color: AppTheme.accentLime.withValues(alpha: 0.35),
+                      width: 0.9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    avatar: const Icon(
+                      Icons.auto_awesome,
+                      color: AppTheme.accentLime,
+                      size: 13,
+                    ),
+                    label: Text(
+                      suggestion,
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onPressed: () => _applySuggestion(suggestion),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -1292,7 +1396,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildSongListTile(Track track) {
+  Widget _buildSongListTile(Track track, {bool isLyricMatch = false}) {
     return ListTile(
       onTap: () {
         _playTrack(track);
@@ -1332,15 +1436,49 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 size: 48,
               ),
       ),
-      title: Text(
-        track.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          color: AppTheme.textPrimary,
-          fontSize: 14,
-          fontWeight: FontWeight.w600,
-        ),
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              track.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppTheme.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (isLyricMatch)
+            Container(
+              margin: const EdgeInsets.only(left: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceLight,
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(
+                  color: AppTheme.accentLime.withValues(alpha: 0.5),
+                  width: 0.8,
+                ),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lyrics, size: 9, color: AppTheme.accentLime),
+                  SizedBox(width: 3),
+                  Text(
+                    'LYRICS',
+                    style: TextStyle(
+                      color: AppTheme.accentLime,
+                      fontSize: 8,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
       subtitle: Text(
         track.artist,

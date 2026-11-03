@@ -531,7 +531,113 @@ class MusicExploreService {
     return matchedPlaylists;
   }
 
-  /// Get Official Top Hits with infinite paginated scrolling (15 per chunk) across country feeds
+  /// Search tracks by lyrics content using LRCLIB search endpoint, then enrich with iTunes metadata
+  Future<List<Track>> searchTracksByLyrics(String lyricsQuery, {int limit = 15}) async {
+    if (lyricsQuery.trim().isEmpty) return [];
+
+    try {
+      final encoded = Uri.encodeComponent(lyricsQuery.trim());
+      final lrclibUrl = Uri.parse('https://lrclib.net/api/search?q=$encoded');
+
+      final response = await _httpClient.get(lrclibUrl, headers: {
+        'User-Agent': 'ispotipay-music-player (v1.0.0)',
+      }).timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final results = json.decode(response.body) as List? ?? [];
+        final List<Track> lyricMatches = [];
+        final seenKeys = <String>{};
+
+        for (final item in results) {
+          final trackName = item['trackName'] as String? ?? '';
+          final artistName = item['artistName'] as String? ?? '';
+          final durationSec = (item['duration'] as num?)?.toInt() ?? 0;
+          final syncedLyrics = item['syncedLyrics'] as String?;
+          final plainLyrics = item['plainLyrics'] as String?;
+
+          // Must have matching lyrics text
+          final hasLyrics = (syncedLyrics != null && syncedLyrics.isNotEmpty) ||
+              (plainLyrics != null && plainLyrics.isNotEmpty);
+
+          if (trackName.isNotEmpty && artistName.isNotEmpty && hasLyrics) {
+            final key = '${trackName.toLowerCase().trim()}_${artistName.toLowerCase().trim()}';
+            if (!seenKeys.contains(key)) {
+              seenKeys.add(key);
+
+              // Find high-res artwork & studio metadata via iTunes for this song
+              final itunesCandidates = await searchTracks('$trackName $artistName', limit: 1);
+              if (itunesCandidates.isNotEmpty) {
+                lyricMatches.add(itunesCandidates.first);
+              } else {
+                lyricMatches.add(
+                  Track(
+                    id: 'lrc_${trackName.hashCode}_${artistName.hashCode}',
+                    title: trackName,
+                    artist: artistName,
+                    album: item['albumName'] as String?,
+                    durationMs: durationSec * 1000,
+                  ),
+                );
+              }
+
+              if (lyricMatches.length >= limit) break;
+            }
+          }
+        }
+        return lyricMatches;
+      }
+    } catch (_) {}
+
+    return [];
+  }
+
+  /// Get live search suggestions/recommendations based on query or popular topics
+  List<String> getSearchSuggestions(String query) {
+    final clean = query.trim().toLowerCase();
+
+    final allPopularSuggestions = [
+      'Taylor Swift',
+      'Maki Dilaw',
+      'Cup of Joe',
+      'The Weeknd',
+      'SZA SOS',
+      'Post Malone',
+      'Billie Eilish',
+      'Dilaw Uhaw',
+      'Bruno Mars Die With A Smile',
+      'Sabrina Carpenter Espresso',
+      'Ed Sheeran Shape of You',
+      'Coldplay Yellow',
+      'Hev Abi',
+      'TJ Monterde Palagi',
+      'Arthur Nery Pagsamo',
+      'Dionela Sining',
+      'Olivia Rodrigo',
+      'Ariana Grande',
+      'Laufey From The Start',
+      'Kendrick Lamar Not Like Us',
+    ];
+
+    if (clean.isEmpty) {
+      return allPopularSuggestions.take(6).toList();
+    }
+
+    final matches = allPopularSuggestions
+        .where((s) => s.toLowerCase().contains(clean))
+        .toList();
+
+    if (matches.isEmpty) {
+      // Suggest search prompts
+      return [
+        query.trim(),
+        '${query.trim()} lyrics',
+        '${query.trim()} album',
+        '${query.trim()} acoustic',
+      ];
+    }
+
+    return matches.take(6).toList();
+  }
   Future<List<Track>> getTopMusic({int offset = 0, int limit = 15}) async {
     final countryFeeds = ['ph', 'us', 'gb', 'jp', 'kr'];
     final country = countryFeeds[(offset ~/ limit) % countryFeeds.length];
