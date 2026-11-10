@@ -132,18 +132,32 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
   }
 
+  bool _isPaginatingQueue = false;
+
   Future<void> _loadMoreUpNext() async {
-    if (_audioService.isFixedQueueMode || _isLoadingMoreUpNext || _activeTrack == null) return;
+    if (_audioService.isFixedQueueMode ||
+        _isLoadingMoreUpNext ||
+        _isPaginatingQueue ||
+        _activeTrack == null) {
+      return;
+    }
+    _isPaginatingQueue = true;
     setState(() {
       _isLoadingMoreUpNext = true;
     });
 
-    final more = await _exploreService.getUpNextQueue(_activeTrack!, limit: 20);
-    if (mounted) {
-      _audioService.appendToQueue(more);
-      setState(() {
-        _isLoadingMoreUpNext = false;
-      });
+    try {
+      final more = await _exploreService.getUpNextQueue(_activeTrack!, limit: 20);
+      if (mounted && more.isNotEmpty) {
+        _audioService.appendToQueue(more);
+      }
+    } catch (_) {} finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMoreUpNext = false;
+        });
+      }
+      _isPaginatingQueue = false;
     }
   }
 
@@ -247,6 +261,8 @@ class _PlayerScreenState extends State<PlayerScreen>
                                   width: 42,
                                   height: 42,
                                   fit: BoxFit.cover,
+                                  cacheWidth: 120,
+                                  cacheHeight: 120,
                                   frameBuilder:
                                       (context, child, frame, wasSync) {
                                         if (wasSync || frame != null) {
@@ -374,6 +390,8 @@ class _PlayerScreenState extends State<PlayerScreen>
                       width: 44,
                       height: 44,
                       fit: BoxFit.cover,
+                      cacheWidth: 120,
+                      cacheHeight: 120,
                       frameBuilder: (context, child, frame, wasSync) {
                         if (wasSync || frame != null) return child;
                         return _buildCustomThumbnail(
@@ -587,42 +605,52 @@ class _PlayerScreenState extends State<PlayerScreen>
                                           ],
                                         ),
                                         StreamBuilder<bool>(
-                                          stream: _audioService.isQueueLoadingStream,
-                                          initialData: _audioService.isQueueLoading,
+                                          stream: _audioService
+                                              .isQueueLoadingStream,
+                                          initialData:
+                                              _audioService.isQueueLoading,
                                           builder: (context, loadingSnap) {
-                                            final isQueueLoading = (loadingSnap.data ?? false) || _isLoadingUpNext;
+                                            final isQueueLoading =
+                                                (loadingSnap.data ?? false) ||
+                                                _isLoadingUpNext;
 
                                             return Container(
-                                              padding: const EdgeInsets.symmetric(
-                                                horizontal: 8,
-                                                vertical: 4,
-                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
                                               decoration: BoxDecoration(
                                                 color: AppTheme.accentLime
                                                     .withValues(alpha: 0.15),
-                                                borderRadius: BorderRadius.circular(
-                                                  8,
-                                                ),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                               ),
                                               child: isQueueLoading
                                                   ? Row(
-                                                      mainAxisSize: MainAxisSize.min,
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
                                                       children: const [
                                                         SizedBox(
                                                           width: 10,
                                                           height: 10,
-                                                          child: CircularProgressIndicator(
-                                                            strokeWidth: 1.8,
-                                                            color: AppTheme.accentLime,
-                                                          ),
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                                strokeWidth:
+                                                                    1.8,
+                                                                color: AppTheme
+                                                                    .accentLime,
+                                                              ),
                                                         ),
                                                         SizedBox(width: 5),
                                                         Text(
                                                           'Loading...',
                                                           style: TextStyle(
-                                                            color: AppTheme.accentLime,
+                                                            color: AppTheme
+                                                                .accentLime,
                                                             fontSize: 10,
-                                                            fontWeight: FontWeight.bold,
+                                                            fontWeight:
+                                                                FontWeight.bold,
                                                           ),
                                                         ),
                                                       ],
@@ -630,9 +658,11 @@ class _PlayerScreenState extends State<PlayerScreen>
                                                   : Text(
                                                       '${liveQueue.length} tracks',
                                                       style: const TextStyle(
-                                                        color: AppTheme.accentLime,
+                                                        color:
+                                                            AppTheme.accentLime,
                                                         fontSize: 11,
-                                                        fontWeight: FontWeight.bold,
+                                                        fontWeight:
+                                                            FontWeight.bold,
                                                       ),
                                                     ),
                                             );
@@ -649,196 +679,195 @@ class _PlayerScreenState extends State<PlayerScreen>
                                   // Unified Timeline Queue List: [Previous/History, Currently Playing, Upcoming Next with Drag & Drop]
                                   Expanded(
                                     child: StreamBuilder<bool>(
-                                      stream: _audioService.isQueueLoadingStream,
+                                      stream:
+                                          _audioService.isQueueLoadingStream,
                                       initialData: _audioService.isQueueLoading,
                                       builder: (context, loadingSnap) {
-                                        final isQueueLoading = (loadingSnap.data ?? false) || _isLoadingUpNext;
+                                        final isQueueLoading =
+                                            (loadingSnap.data ?? false) ||
+                                            _isLoadingUpNext;
 
-                                        if (isQueueLoading && liveQueue.isEmpty) {
+                                        if (isQueueLoading &&
+                                            liveQueue.isEmpty) {
                                           return _buildUpNextShimmerList();
                                         }
 
                                         return NotificationListener<
-                                            ScrollNotification
-                                          >(
-                                            onNotification:
-                                                (
-                                                  ScrollNotification scrollInfo,
-                                                ) {
-                                                  if (scrollInfo
-                                                          .metrics
-                                                          .pixels >=
-                                                      scrollInfo
-                                                              .metrics
-                                                              .maxScrollExtent -
-                                                          200) {
-                                                    _loadMoreUpNext();
+                                          ScrollNotification
+                                        >(
+                                          onNotification:
+                                              (ScrollNotification scrollInfo) {
+                                                if (scrollInfo.metrics.pixels >=
+                                                    scrollInfo
+                                                            .metrics
+                                                            .maxScrollExtent -
+                                                        200) {
+                                                  _loadMoreUpNext();
+                                                }
+                                                return false;
+                                              },
+                                          child: ListView(
+                                            controller: scrollController,
+                                            physics: const BouncingScrollPhysics(
+                                              parent:
+                                                  AlwaysScrollableScrollPhysics(),
+                                            ),
+                                            children: [
+                                              // 1. Finished History Items (at the top, strict unique IDs)
+                                              Builder(
+                                                builder: (context) {
+                                                  final renderedHistoryIds =
+                                                      <String>{};
+                                                  final uniqueHistory =
+                                                      <Track>[];
+                                                  for (final h in liveHistory) {
+                                                    if (h.id !=
+                                                            liveCurrent?.id &&
+                                                        !renderedHistoryIds
+                                                            .contains(h.id)) {
+                                                      renderedHistoryIds.add(
+                                                        h.id,
+                                                      );
+                                                      uniqueHistory.add(h);
+                                                    }
                                                   }
-                                                  return false;
+
+                                                  return Column(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      for (
+                                                        int i = 0;
+                                                        i <
+                                                            uniqueHistory
+                                                                .length;
+                                                        i++
+                                                      )
+                                                        _buildUnifiedQueueItem(
+                                                          ctx: ctx,
+                                                          track:
+                                                              uniqueHistory[i],
+                                                          isPlaying: false,
+                                                          isHistory: true,
+                                                          listIndex: i,
+                                                        ),
+                                                    ],
+                                                  );
                                                 },
-                                            child: ListView(
-                                              controller: scrollController,
-                                              physics: const BouncingScrollPhysics(
-                                                parent:
-                                                    AlwaysScrollableScrollPhysics(),
                                               ),
-                                              children: [
-                                                // 1. Finished History Items (at the top, strict unique IDs)
-                                                Builder(
-                                                  builder: (context) {
-                                                    final renderedHistoryIds =
-                                                        <String>{};
-                                                    final uniqueHistory =
-                                                        <Track>[];
-                                                    for (final h
-                                                        in liveHistory) {
-                                                      if (h.id !=
-                                                              liveCurrent?.id &&
-                                                          !renderedHistoryIds
-                                                              .contains(h.id)) {
-                                                        renderedHistoryIds.add(
-                                                          h.id,
-                                                        );
-                                                        uniqueHistory.add(h);
-                                                      }
-                                                    }
 
-                                                    return Column(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      children: [
-                                                        for (
-                                                          int i = 0;
-                                                          i <
-                                                              uniqueHistory
-                                                                  .length;
-                                                          i++
-                                                        )
-                                                          _buildUnifiedQueueItem(
-                                                            ctx: ctx,
-                                                            track:
-                                                                uniqueHistory[i],
-                                                            isPlaying: false,
-                                                            isHistory: true,
-                                                            listIndex: i,
-                                                          ),
-                                                      ],
+                                              // 2. Unified Draggable Active Timeline: [Currently Playing + Upcoming Queue]
+                                              Builder(
+                                                builder: (context) {
+                                                  final activeList = <Track>[];
+                                                  if (liveCurrent != null) {
+                                                    activeList.add(liveCurrent);
+                                                  }
+
+                                                  // Exclude history items and currently playing track from upcoming queue to guarantee no duplicates
+                                                  final historyIdSet =
+                                                      liveHistory
+                                                          .map((t) => t.id)
+                                                          .toSet();
+                                                  final seenQueueIds =
+                                                      <String>{};
+                                                  if (liveCurrent != null) {
+                                                    seenQueueIds.add(
+                                                      liveCurrent.id,
                                                     );
-                                                  },
-                                                ),
+                                                  }
 
-                                                // 2. Unified Draggable Active Timeline: [Currently Playing + Upcoming Queue]
-                                                Builder(
-                                                  builder: (context) {
-                                                    final activeList =
-                                                        <Track>[];
-                                                    if (liveCurrent != null) {
-                                                      activeList.add(
-                                                        liveCurrent,
-                                                      );
+                                                  for (final t in liveQueue) {
+                                                    if (!historyIdSet.contains(
+                                                          t.id,
+                                                        ) &&
+                                                        !seenQueueIds.contains(
+                                                          t.id,
+                                                        )) {
+                                                      seenQueueIds.add(t.id);
+                                                      activeList.add(t);
                                                     }
+                                                  }
 
-                                                    // Exclude history items and currently playing track from upcoming queue to guarantee no duplicates
-                                                    final historyIdSet =
-                                                        liveHistory
-                                                            .map((t) => t.id)
-                                                            .toSet();
-                                                    final seenQueueIds =
-                                                        <String>{};
-                                                    if (liveCurrent != null) {
-                                                      seenQueueIds.add(
-                                                        liveCurrent.id,
-                                                      );
-                                                    }
+                                                  if (activeList.isEmpty) {
+                                                    return const SizedBox.shrink();
+                                                  }
 
-                                                    for (final t in liveQueue) {
-                                                      if (!historyIdSet
-                                                              .contains(t.id) &&
-                                                          !seenQueueIds
-                                                              .contains(t.id)) {
-                                                        seenQueueIds.add(t.id);
-                                                        activeList.add(t);
-                                                      }
-                                                    }
+                                                  return ReorderableListView.builder(
+                                                    shrinkWrap: true,
+                                                    physics:
+                                                        const NeverScrollableScrollPhysics(),
+                                                    buildDefaultDragHandles:
+                                                        false,
+                                                    itemCount:
+                                                        activeList.length,
+                                                    onReorderItem:
+                                                        (oldIdx, newIdx) {
+                                                          _audioService
+                                                              .reorderActiveTimeline(
+                                                                oldIdx,
+                                                                newIdx,
+                                                              );
+                                                        },
+                                                    itemBuilder: (context, activeIdx) {
+                                                      final track =
+                                                          activeList[activeIdx];
+                                                      final isCurrent =
+                                                          track.id ==
+                                                          liveCurrent?.id;
+                                                      final overallIndex =
+                                                          liveHistory.length +
+                                                          activeIdx;
 
-                                                    if (activeList.isEmpty) {
-                                                      return const SizedBox.shrink();
-                                                    }
-
-                                                    return ReorderableListView.builder(
-                                                      shrinkWrap: true,
-                                                      physics:
-                                                          const NeverScrollableScrollPhysics(),
-                                                      buildDefaultDragHandles:
-                                                          false,
-                                                      itemCount:
-                                                          activeList.length,
-                                                      onReorderItem:
-                                                          (oldIdx, newIdx) {
-                                                            _audioService
-                                                                .reorderActiveTimeline(
-                                                                  oldIdx,
-                                                                  newIdx,
-                                                                );
-                                                          },
-                                                      itemBuilder: (context, activeIdx) {
-                                                        final track =
-                                                            activeList[activeIdx];
-                                                        final isCurrent =
-                                                            track.id ==
-                                                            liveCurrent?.id;
-                                                        final overallIndex =
-                                                            liveHistory.length +
-                                                            activeIdx;
-
-                                                        return Container(
-                                                          key: ValueKey(
-                                                            'active_${track.id}_$activeIdx',
-                                                          ),
-                                                          child:
-                                                              _buildUnifiedQueueItem(
-                                                                ctx: ctx,
-                                                                track: track,
-                                                                isPlaying:
-                                                                    isCurrent,
-                                                                isHistory:
-                                                                    false,
-                                                                listIndex:
-                                                                    overallIndex,
-                                                              ),
-                                                        );
-                                                      },
-                                                    );
-                                                  },
-                                                ),
-
-                                                // 4. Shimmer loading footer when paginating
-                                                if (_isLoadingMoreUpNext) ...[
-                                                  _buildShimmerQueueTile(),
-                                                  _buildShimmerQueueTile(),
-                                                ],
-
-                                                if (liveHistory.isEmpty &&
-                                                    liveCurrent == null &&
-                                                    liveQueue.isEmpty)
-                                                  const Padding(
-                                                    padding:
-                                                        EdgeInsets.symmetric(
-                                                          vertical: 40,
+                                                      return Container(
+                                                        key: ValueKey(
+                                                          'active_${track.id}_$activeIdx',
                                                         ),
-                                                    child: Center(
-                                                      child: Text(
-                                                        'Queue is empty',
-                                                        style: TextStyle(
-                                                          color: AppTheme
-                                                              .textSecondary,
-                                                        ),
+                                                        child:
+                                                            _buildUnifiedQueueItem(
+                                                              ctx: ctx,
+                                                              track: track,
+                                                              isPlaying:
+                                                                  isCurrent,
+                                                              isHistory: false,
+                                                              listIndex:
+                                                                  overallIndex,
+                                                            ),
+                                                      );
+                                                    },
+                                                  );
+                                                },
+                                              ),
+
+                                              // 4. Shimmer loading footer when paginating
+                                              if (_isLoadingMoreUpNext) ...[
+                                                const SizedBox(height: 6),
+                                                _buildShimmerQueueTile(),
+                                                _buildShimmerQueueTile(),
+                                                _buildShimmerQueueTile(),
+                                                const SizedBox(height: 12),
+                                              ],
+
+                                              if (liveHistory.isEmpty &&
+                                                  liveCurrent == null &&
+                                                  liveQueue.isEmpty)
+                                                const Padding(
+                                                  padding: EdgeInsets.symmetric(
+                                                    vertical: 40,
+                                                  ),
+                                                  child: Center(
+                                                    child: Text(
+                                                      'Queue is empty',
+                                                      style: TextStyle(
+                                                        color: AppTheme
+                                                            .textSecondary,
                                                       ),
                                                     ),
                                                   ),
-                                              ],
-                                            ),
-                                          );
+                                                ),
+                                            ],
+                                          ),
+                                        );
                                       },
                                     ),
                                   ),
@@ -991,7 +1020,9 @@ class _PlayerScreenState extends State<PlayerScreen>
               color: _isReaderMode ? AppTheme.accentLime : AppTheme.textPrimary,
               size: 22,
             ),
-            tooltip: _isReaderMode ? 'Switch to Synced Lyrics' : 'Switch to Reader View',
+            tooltip: _isReaderMode
+                ? 'Switch to Synced Lyrics'
+                : 'Switch to Reader View',
             onPressed: () {
               setState(() {
                 _isReaderMode = !_isReaderMode;
@@ -1074,7 +1105,10 @@ class _PlayerScreenState extends State<PlayerScreen>
                     // Static Reader Mode: Clean paragraph/poem style scrolling without auto-movement or fading
                     return ListView.builder(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 20,
+                      ),
                       itemCount: _lyrics.length,
                       itemBuilder: (context, index) {
                         final line = _lyrics[index];
@@ -1088,7 +1122,10 @@ class _PlayerScreenState extends State<PlayerScreen>
                               }
                             },
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 4,
+                              ),
                               child: Text(
                                 line.text.isEmpty ? '♪' : line.text,
                                 style: const TextStyle(
@@ -1182,7 +1219,9 @@ class _PlayerScreenState extends State<PlayerScreen>
                                                 style: TextStyle(
                                                   color: isCurrent
                                                       ? AppTheme.accentLime
-                                                      : const Color(0xFFADB5C4).withValues(
+                                                      : const Color(
+                                                          0xFFADB5C4,
+                                                        ).withValues(
                                                           alpha: 0.72,
                                                         ),
                                                   fontSize: isCurrent ? 22 : 17,
