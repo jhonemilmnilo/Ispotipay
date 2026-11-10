@@ -14,8 +14,33 @@ void main() {
   runApp(const IspotipayApp());
 }
 
-class IspotipayApp extends StatelessWidget {
+class IspotipayApp extends StatefulWidget {
   const IspotipayApp({super.key});
+
+  @override
+  State<IspotipayApp> createState() => _IspotipayAppState();
+}
+
+class _IspotipayAppState extends State<IspotipayApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    super.didHaveMemoryPressure();
+    // Low-end memory recovery: clear live image cache when OS reports memory pressure
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+  }
 
   @override
   Widget build(BuildContext context) {

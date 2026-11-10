@@ -115,6 +115,8 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
         _isLoading = false;
         _offset = cleanList.length;
       });
+      // Suspend shimmer animation ticker once loaded to conserve CPU
+      _shimmerController.stop();
     }
   }
 

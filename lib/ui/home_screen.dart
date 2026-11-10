@@ -244,6 +244,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _isLoadingTop = false;
         _isLoadingAll = false;
       });
+
+      // Battery & CPU optimization: pause continuous shimmer animation once initial loading completes
+      _shimmerController.stop();
     }
   }
 
