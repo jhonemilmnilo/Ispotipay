@@ -5,12 +5,7 @@ import '../models/track.dart';
 import 'database_service.dart';
 import 'music_explore_service.dart';
 
-enum LoopModeType {
-  off,
-  repeatOne,
-  repeatAll,
-  playOnce,
-}
+enum LoopModeType { off, repeatOne, repeatAll, playOnce }
 
 class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
@@ -349,11 +344,15 @@ class AudioPlayerService {
     // If resetQueue was requested and no initial queue was provided, immediately fetch a fresh, pristine radio queue
     if (resetQueue && initialQueue == null) {
       try {
-        final freshQueue = await _exploreService.getUpNextQueue(track, limit: 25);
+        final freshQueue = await _exploreService.getUpNextQueue(
+          track,
+          limit: 25,
+        );
         if (_queueGeneration == currentGen && !_isFixedQueueMode) {
           setQueue(freshQueue);
         }
-      } catch (_) {} finally {
+      } catch (_) {
+      } finally {
         if (_queueGeneration == currentGen) {
           _isQueueLoading = false;
           _isQueueLoadingController.add(false);
@@ -382,7 +381,8 @@ class AudioPlayerService {
     final seenIds = <String>{};
     final seenTitles = <String>{};
     for (final t in allPlaylistTracks) {
-      final norm = '${t.title.toLowerCase().trim()}_${t.artist.toLowerCase().trim()}';
+      final norm =
+          '${t.title.toLowerCase().trim()}_${t.artist.toLowerCase().trim()}';
       if (!seenIds.contains(t.id) && !seenTitles.contains(norm)) {
         seenIds.add(t.id);
         seenTitles.add(norm);
@@ -424,9 +424,12 @@ class AudioPlayerService {
   }
 
   Future<void> _executePlay(Track track, {bool addToHistory = true}) async {
-    if (addToHistory && _currentTrack != null && _currentTrack!.id != track.id) {
+    if (addToHistory &&
+        _currentTrack != null &&
+        _currentTrack!.id != track.id) {
       // Avoid duplicate consecutive tracks in history
-      if (_playbackHistory.isEmpty || _playbackHistory.last.id != _currentTrack!.id) {
+      if (_playbackHistory.isEmpty ||
+          _playbackHistory.last.id != _currentTrack!.id) {
         _playbackHistory.add(_currentTrack!);
         _historyController.add(_playbackHistory);
       }
@@ -475,7 +478,11 @@ class AudioPlayerService {
 
       _isPreloading = false;
       _isPreloadingController.add(false);
+
+      // Start from 0 volume and smoothly fade in to avoid acoustic pops
+      await _player.setVolume(0.0);
       await _player.play();
+      _fadeInVolume();
 
       // Trigger pre-warm for subsequent tracks
       _prefetchUpcomingUrls();
@@ -493,6 +500,7 @@ class AudioPlayerService {
 
   /// Play the next song in the queue (Strictly the next item in Up Next)
   Future<void> playNext() async {
+    await _fadeOutVolume(duration: const Duration(milliseconds: 150));
     if (_queue.isNotEmpty) {
       final nextTrack = _queue.removeAt(0);
       _queueController.add(_queue);
@@ -519,6 +527,7 @@ class AudioPlayerService {
       return;
     }
 
+    await _fadeOutVolume(duration: const Duration(milliseconds: 150));
     if (_playbackHistory.isNotEmpty) {
       final prevTrack = _playbackHistory.removeLast();
       _historyController.add(_playbackHistory);
@@ -560,7 +569,9 @@ class AudioPlayerService {
 
   /// Automatically fetch new tracks based on currently playing and previous vibe context
   Future<void> _autoReplenishQueue() async {
-    if (_isFixedQueueMode || _isAutoReplenishing || _currentTrack == null) return;
+    if (_isFixedQueueMode || _isAutoReplenishing || _currentTrack == null) {
+      return;
+    }
     _isAutoReplenishing = true;
     final currentGen = _queueGeneration;
 
@@ -579,16 +590,83 @@ class AudioPlayerService {
     _isAutoReplenishing = false;
   }
 
+  /// Smooth audio volume ramping utilities for pleasant acoustic transitions
+  int _fadeGeneration = 0;
+
+  Future<void> _fadeInVolume({
+    double targetVolume = 1.0,
+    Duration duration = const Duration(milliseconds: 300),
+  }) async {
+    final currentGen = ++_fadeGeneration;
+    const steps = 8;
+    final intervalMs = (duration.inMilliseconds / steps).round();
+
+    for (int i = 1; i <= steps; i++) {
+      if (_fadeGeneration != currentGen) {
+        return; // Cancel if another transition started
+      }
+      await Future.delayed(Duration(milliseconds: intervalMs));
+      if (_fadeGeneration != currentGen) return;
+      // Exponential / quadratic curve for natural human auditory perception
+      final progress = i / steps;
+      final curved = progress * progress;
+      final vol = (targetVolume * curved).clamp(0.0, 1.0);
+      try {
+        await _player.setVolume(vol);
+      } catch (_) {}
+    }
+    if (_fadeGeneration == currentGen) {
+      try {
+        await _player.setVolume(targetVolume);
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _fadeOutVolume({
+    Duration duration = const Duration(milliseconds: 180),
+  }) async {
+    final currentGen = ++_fadeGeneration;
+    final startVol = _player.volume;
+    if (startVol <= 0.0) return;
+
+    const steps = 6;
+    final intervalMs = (duration.inMilliseconds / steps).round();
+
+    for (int i = 1; i <= steps; i++) {
+      if (_fadeGeneration != currentGen) {
+        return;
+      }
+      await Future.delayed(Duration(milliseconds: intervalMs));
+      if (_fadeGeneration != currentGen) return;
+      final progress = i / steps;
+      final curved = (1.0 - progress) * (1.0 - progress);
+      final vol = (startVol * curved).clamp(0.0, 1.0);
+      try {
+        await _player.setVolume(vol);
+      } catch (_) {}
+    }
+    if (_fadeGeneration == currentGen) {
+      try {
+        await _player.setVolume(0.0);
+      } catch (_) {}
+    }
+  }
+
   Future<void> play() async {
+    await _player.setVolume(0.0);
     await _player.play();
+    _fadeInVolume();
   }
 
   Future<void> pause() async {
+    await _fadeOutVolume(duration: const Duration(milliseconds: 180));
     await _player.pause();
   }
 
   Future<void> resume() async {
+    await _player.setVolume(0.0);
     await _player.play();
+    _fadeInVolume();
   }
 
   Future<void> togglePlayPause() async {
