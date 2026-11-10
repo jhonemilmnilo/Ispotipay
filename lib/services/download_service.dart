@@ -90,6 +90,45 @@ class DownloadService {
     }
   }
 
+  /// Delete a downloaded track: removes .m4a and .lrc files from disk and clears SQLite paths
+  Future<bool> deleteDownloadedTrack(Track track) async {
+    try {
+      if (track.audioPath != null && track.audioPath!.isNotEmpty) {
+        final audioFile = File(track.audioPath!);
+        if (await audioFile.exists()) {
+          await audioFile.delete();
+        }
+      }
+
+      if (track.lyricsPath != null && track.lyricsPath!.isNotEmpty) {
+        final lyricsFile = File(track.lyricsPath!);
+        if (await lyricsFile.exists()) {
+          await lyricsFile.delete();
+        }
+      }
+
+      // Clear local file paths in SQLite
+      final clearedTrack = Track(
+        id: track.id,
+        title: track.title,
+        artist: track.artist,
+        album: track.album,
+        durationMs: track.durationMs,
+        thumbnailUrl: track.thumbnailUrl,
+        audioPath: null,
+        lyricsPath: null,
+        playCount: track.playCount,
+        lastPlayedAt: track.lastPlayedAt,
+      );
+
+      await _dbService.saveTrack(clearedTrack);
+      _dbService.notifyLibraryChanged();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   void dispose() {
     _yt.close();
     _exploreService.dispose();

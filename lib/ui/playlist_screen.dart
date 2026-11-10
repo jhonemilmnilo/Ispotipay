@@ -8,6 +8,7 @@ import '../services/music_explore_service.dart';
 import 'app_theme.dart';
 import 'mini_player_bar.dart';
 import 'player_screen.dart';
+import 'widgets/app_toast.dart';
 
 class PlaylistScreen extends StatefulWidget {
   final Playlist playlist;
@@ -90,6 +91,10 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
 
     final results = await _exploreService.searchTracks(widget.playlist.searchQuery, limit: 25);
     if (mounted) {
+      // Cross-check with local downloads to pre-mark already downloaded songs
+      final downloadedList = await _dbService.getDownloadedTracks(limit: 200);
+      final downloadedMap = {for (final d in downloadedList) d.id: d};
+
       setState(() {
         final existingIds = <String>{};
         final existingTitles = <String>{};
@@ -100,7 +105,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
           if (!existingIds.contains(t.id) && !existingTitles.contains(normKey)) {
             existingIds.add(t.id);
             existingTitles.add(normKey);
-            cleanList.add(t);
+            // Apply downloaded paths if available locally
+            final matchedDownloaded = downloadedMap[t.id];
+            cleanList.add(matchedDownloaded ?? t);
           }
         }
 
@@ -255,7 +262,7 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final track = _tracks[index];
-                    return _buildSongTile(track);
+                    return _buildSongTile(track, index);
                   },
                   childCount: _tracks.length,
                 ),
@@ -293,9 +300,108 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildSongTile(Track track) {
+  void _showDeleteConfirmation(Track track, int index) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          decoration: const BoxDecoration(
+            color: Color(0xFF0F1524),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+            boxShadow: [
+              BoxShadow(color: Colors.black87, blurRadius: 20, offset: Offset(0, -4)),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.textSecondary.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 36),
+              const SizedBox(height: 12),
+              const Text(
+                'Delete Downloaded Track?',
+                style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Remove "${track.title}" from offline storage?\nSynced lyrics and audio file will be deleted.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 13,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppTheme.divider),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('Cancel', style: TextStyle(color: AppTheme.textPrimary)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final success = await DownloadService().deleteDownloadedTrack(track);
+                        if (success && mounted) {
+                          setState(() {
+                            _tracks.removeAt(index);
+                          });
+                          AppToast.show(
+                            context,
+                            message: 'Deleted "${track.title}" from downloads',
+                            icon: Icons.delete_outline_rounded,
+                            iconColor: Colors.redAccent,
+                          );
+                        }
+                      },
+                      child: const Text(
+                        'Delete',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSongTile(Track track, int index) {
     return ListTile(
       onTap: () => _playTrack(track),
+      onLongPress: widget.isLocalDownloads ? () => _showDeleteConfirmation(track, index) : null,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       leading: ClipRRect(
         borderRadius: BorderRadius.circular(8),
@@ -336,17 +442,33 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
               size: 20,
             ),
             onPressed: () async {
-              if (track.isDownloaded) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Downloading "${track.title}" + lyrics...')),
+              if (track.isDownloaded) {
+                AppToast.show(
+                  context,
+                  message: 'Already downloaded for offline',
+                  icon: Icons.download_done_rounded,
+                  iconColor: AppTheme.accentLime,
+                );
+                return;
+              }
+
+              AppToast.show(
+                context,
+                message: 'Downloading "${track.title}"...',
+                icon: Icons.downloading_rounded,
+                iconColor: AppTheme.primary,
               );
+
               final downloaded = await DownloadService().downloadTrack(track);
               if (downloaded != null && mounted) {
-                setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Downloaded with lyrics! Ready for offline.'),
-                  ),
+                setState(() {
+                  _tracks[index] = downloaded;
+                });
+                AppToast.show(
+                  context,
+                  message: 'Downloaded "${track.title}" + lyrics',
+                  icon: Icons.download_done_rounded,
+                  iconColor: AppTheme.accentLime,
                 );
               }
             },
@@ -356,18 +478,14 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
             onPressed: () async {
               final isFav = await _dbService.toggleFavorite(track);
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(isFav ? 'Added to Favorites' : 'Removed from Favorites'),
-                    duration: const Duration(seconds: 1),
-                  ),
+                AppToast.show(
+                  context,
+                  message: isFav ? 'Added to Favorites' : 'Removed from Favorites',
+                  icon: isFav ? Icons.favorite : Icons.favorite_border,
+                  iconColor: isFav ? Colors.redAccent : AppTheme.textSecondary,
                 );
               }
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.play_circle_fill, color: AppTheme.accentLime, size: 28),
-            onPressed: () => _playTrack(track),
           ),
         ],
       ),

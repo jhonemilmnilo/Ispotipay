@@ -10,6 +10,7 @@ import 'app_theme.dart';
 import 'mini_player_bar.dart';
 import 'player_screen.dart';
 import 'playlist_screen.dart';
+import 'widgets/app_toast.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1494,25 +1495,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
             onPressed: () async {
               if (track.isDownloaded) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Song already downloaded')),
+                AppToast.show(
+                  context,
+                  message: 'Already downloaded for offline',
+                  icon: Icons.download_done_rounded,
+                  iconColor: AppTheme.accentLime,
                 );
                 return;
               }
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Downloading "${track.title}" + lyrics...')),
+
+              AppToast.show(
+                context,
+                message: 'Downloading "${track.title}"...',
+                icon: Icons.downloading_rounded,
+                iconColor: AppTheme.primary,
               );
+
               final downloaded = await DownloadService().downloadTrack(track);
               if (downloaded != null && mounted) {
                 _loadAllSections();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    backgroundColor: AppTheme.surfaceLight,
-                    content: Text(
-                      'Downloaded with lyrics! Ready for offline.',
-                      style: TextStyle(color: AppTheme.accentLime),
-                    ),
-                  ),
+                AppToast.show(
+                  context,
+                  message: 'Downloaded "${track.title}" + lyrics',
+                  icon: Icons.download_done_rounded,
+                  iconColor: AppTheme.accentLime,
                 );
               }
             },
