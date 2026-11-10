@@ -147,11 +147,15 @@ class _PlayerScreenState extends State<PlayerScreen>
     });
 
     try {
-      final more = await _exploreService.getUpNextQueue(_activeTrack!, limit: 20);
+      final more = await _exploreService.getUpNextQueue(
+        _activeTrack!,
+        limit: 20,
+      );
       if (mounted && more.isNotEmpty) {
         _audioService.appendToQueue(more);
       }
-    } catch (_) {} finally {
+    } catch (_) {
+    } finally {
       if (mounted) {
         setState(() {
           _isLoadingMoreUpNext = false;
@@ -839,13 +843,14 @@ class _PlayerScreenState extends State<PlayerScreen>
                                                 },
                                               ),
 
-                                              // 4. Shimmer loading footer when paginating
-                                              if (_isLoadingMoreUpNext) ...[
+                                              // 4. Shimmer loading footer when paginating or when background queue is fetching
+                                              if (_isLoadingMoreUpNext ||
+                                                  (isQueueLoading && liveQueue.isNotEmpty)) ...[
                                                 const SizedBox(height: 6),
                                                 _buildShimmerQueueTile(),
                                                 _buildShimmerQueueTile(),
                                                 _buildShimmerQueueTile(),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 16),
                                               ],
 
                                               if (liveHistory.isEmpty &&
