@@ -19,7 +19,8 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
   final DatabaseService _dbService = DatabaseService();
   final MusicExploreService _exploreService = MusicExploreService();
   final TextEditingController _searchController = TextEditingController();
@@ -160,7 +161,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   void _onScroll() {
     // Infinite scroll trigger: when user is 300px away from the bottom
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 300) {
       if (!_isLoadingMoreAll && !_isSearching) {
         _loadMoreAllMusic();
       }
@@ -172,7 +174,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       _isLoadingMoreAll = true;
     });
 
-    final newBatch = await _exploreService.fetchNextAllMusicBatch(batchSize: 25);
+    final newBatch = await _exploreService.fetchNextAllMusicBatch(
+      batchSize: 25,
+    );
     if (mounted) {
       setState(() {
         // Prevent duplicate IDs
@@ -282,7 +286,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
       // Deduplicate lyricTracks if already present in direct track results
       final trackIds = tracks.map((t) => t.id).toSet();
-      final trackNames = tracks.map((t) => '${t.title.toLowerCase()}_${t.artist.toLowerCase()}').toSet();
+      final trackNames = tracks
+          .map((t) => '${t.title.toLowerCase()}_${t.artist.toLowerCase()}')
+          .toSet();
       final cleanLyricMatches = lyricTracks.where((lt) {
         final key = '${lt.title.toLowerCase()}_${lt.artist.toLowerCase()}';
         return !trackIds.contains(lt.id) && !trackNames.contains(key);
@@ -328,27 +334,59 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        RichText(
-                          text: const TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'IsPo',
-                                style: TextStyle(
-                                  color: AppTheme.textPrimary,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.bold,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            RichText(
+                              text: const TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: 'IsPo',
+                                    style: TextStyle(
+                                      color: AppTheme.textPrimary,
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: 'TiPay',
+                                    style: TextStyle(
+                                      color: AppTheme.accentLime,
+                                      fontSize: 26,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppTheme.surfaceLight,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: AppTheme.accentLime.withValues(
+                                    alpha: 0.35,
+                                  ),
+                                  width: 1,
                                 ),
                               ),
-                              TextSpan(
-                                text: 'TiPay',
+                              child: const Text(
+                                'v1',
                                 style: TextStyle(
                                   color: AppTheme.accentLime,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
 
                         // Top Bar Action Pills: Favorites & Downloads
@@ -365,7 +403,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                       playlist: Playlist(
                                         id: 'local_favorites',
                                         title: 'Liked Songs & Favorites',
-                                        description: 'Your saved favorite tracks',
+                                        description:
+                                            'Your saved favorite tracks',
                                         searchQuery: '',
                                       ),
                                       isLocalFavorites: true,
@@ -374,13 +413,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                 ).then((_) => _loadLocalLibrary());
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppTheme.surface,
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
                                     color: _favorites.isNotEmpty
-                                        ? Colors.redAccent.withValues(alpha: 0.5)
+                                        ? Colors.redAccent.withValues(
+                                            alpha: 0.5,
+                                          )
                                         : AppTheme.divider,
                                     width: 1.1,
                                   ),
@@ -389,15 +433,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      _favorites.isNotEmpty ? Icons.favorite : Icons.favorite_border,
-                                      color: _favorites.isNotEmpty ? Colors.redAccent : AppTheme.textSecondary,
+                                      _favorites.isNotEmpty
+                                          ? Icons.favorite
+                                          : Icons.favorite_border,
+                                      color: _favorites.isNotEmpty
+                                          ? Colors.redAccent
+                                          : AppTheme.textSecondary,
                                       size: 16,
                                     ),
                                     const SizedBox(width: 5),
                                     Text(
                                       '${_favorites.length}',
                                       style: TextStyle(
-                                        color: _favorites.isNotEmpty ? AppTheme.textPrimary : AppTheme.textSecondary,
+                                        color: _favorites.isNotEmpty
+                                            ? AppTheme.textPrimary
+                                            : AppTheme.textSecondary,
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -418,7 +468,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                       playlist: Playlist(
                                         id: 'local_downloads',
                                         title: 'Downloaded Songs',
-                                        description: 'Offline audio with synced lyrics',
+                                        description:
+                                            'Offline audio with synced lyrics',
                                         searchQuery: '',
                                       ),
                                       isLocalDownloads: true,
@@ -427,13 +478,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                 ).then((_) => _loadLocalLibrary());
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: AppTheme.surface,
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
                                     color: _downloads.isNotEmpty
-                                        ? AppTheme.accentLime.withValues(alpha: 0.5)
+                                        ? AppTheme.accentLime.withValues(
+                                            alpha: 0.5,
+                                          )
                                         : AppTheme.divider,
                                     width: 1.1,
                                   ),
@@ -442,15 +498,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Icon(
-                                      _downloads.isNotEmpty ? Icons.download_done_rounded : Icons.download_rounded,
-                                      color: _downloads.isNotEmpty ? AppTheme.accentLime : AppTheme.textSecondary,
+                                      _downloads.isNotEmpty
+                                          ? Icons.download_done_rounded
+                                          : Icons.download_rounded,
+                                      color: _downloads.isNotEmpty
+                                          ? AppTheme.accentLime
+                                          : AppTheme.textSecondary,
                                       size: 16,
                                     ),
                                     const SizedBox(width: 5),
                                     Text(
                                       '${_downloads.length}',
                                       style: TextStyle(
-                                        color: _downloads.isNotEmpty ? AppTheme.textPrimary : AppTheme.textSecondary,
+                                        color: _downloads.isNotEmpty
+                                            ? AppTheme.textPrimary
+                                            : AppTheme.textSecondary,
                                         fontSize: 12,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -493,7 +555,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       scrollDirection: Axis.horizontal,
                       itemCount: _searchMatchedAlbums.length,
-                      separatorBuilder: (context, index) => const SizedBox(width: 12),
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(width: 12),
                       itemBuilder: (context, index) {
                         final album = _searchMatchedAlbums[index];
                         final isArtist = album.id.startsWith('artist_');
@@ -527,7 +590,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                 Stack(
                                   children: [
                                     ClipRRect(
-                                      borderRadius: BorderRadius.circular(isArtist ? 45 : 8),
+                                      borderRadius: BorderRadius.circular(
+                                        isArtist ? 45 : 8,
+                                      ),
                                       child: album.thumbnailUrl != null
                                           ? Image.network(
                                               album.thumbnailUrl!,
@@ -536,23 +601,34 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                               fit: BoxFit.cover,
                                               cacheWidth: 180,
                                               cacheHeight: 180,
-                                              errorBuilder: (context, error, stackTrace) => Container(
-                                                width: 90,
-                                                height: 90,
-                                                color: AppTheme.surfaceLight,
-                                                child: Icon(
-                                                  isArtist ? Icons.person : Icons.album,
-                                                  color: AppTheme.textSecondary,
-                                                  size: 32,
-                                                ),
-                                              ),
+                                              errorBuilder:
+                                                  (
+                                                    context,
+                                                    error,
+                                                    stackTrace,
+                                                  ) => Container(
+                                                    width: 90,
+                                                    height: 90,
+                                                    color:
+                                                        AppTheme.surfaceLight,
+                                                    child: Icon(
+                                                      isArtist
+                                                          ? Icons.person
+                                                          : Icons.album,
+                                                      color: AppTheme
+                                                          .textSecondary,
+                                                      size: 32,
+                                                    ),
+                                                  ),
                                             )
                                           : Container(
                                               width: 90,
                                               height: 90,
                                               color: AppTheme.surfaceLight,
                                               child: Icon(
-                                                isArtist ? Icons.person : Icons.album,
+                                                isArtist
+                                                    ? Icons.person
+                                                    : Icons.album,
                                                 color: AppTheme.textSecondary,
                                                 size: 32,
                                               ),
@@ -562,15 +638,24 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                       top: 4,
                                       left: 4,
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 5,
+                                          vertical: 2,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: Colors.black.withValues(alpha: 0.75),
-                                          borderRadius: BorderRadius.circular(4),
+                                          color: Colors.black.withValues(
+                                            alpha: 0.75,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            4,
+                                          ),
                                         ),
                                         child: Text(
                                           isArtist ? 'ARTIST' : 'ALBUM',
                                           style: TextStyle(
-                                            color: isArtist ? AppTheme.accentLime : AppTheme.textPrimary,
+                                            color: isArtist
+                                                ? AppTheme.accentLime
+                                                : AppTheme.textPrimary,
                                             fontSize: 8,
                                             fontWeight: FontWeight.w900,
                                           ),
@@ -623,7 +708,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               // Songs Section
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Text(
                     'Songs (${_searchResults.length})',
                     style: const TextStyle(
@@ -635,13 +723,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               ),
               SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final track = _searchResults[index];
-                    return _buildSongListTile(track);
-                  },
-                  childCount: _searchResults.length,
-                ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final track = _searchResults[index];
+                  return _buildSongListTile(track);
+                }, childCount: _searchResults.length),
               ),
 
               // Matching Lyrics Section
@@ -651,7 +736,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
                     child: Row(
                       children: const [
-                        Icon(Icons.lyrics_rounded, color: AppTheme.accentLime, size: 20),
+                        Icon(
+                          Icons.lyrics_rounded,
+                          color: AppTheme.accentLime,
+                          size: 20,
+                        ),
                         SizedBox(width: 8),
                         Text(
                           'Matches In Lyrics',
@@ -666,23 +755,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                 ),
                 SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final track = _lyricResults[index];
-                      return _buildSongListTile(track, isLyricMatch: true);
-                    },
-                    childCount: _lyricResults.length,
-                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final track = _lyricResults[index];
+                    return _buildSongListTile(track, isLyricMatch: true);
+                  }, childCount: _lyricResults.length),
                 ),
               ],
             ] else ...[
               // 2. Top Music Section (Horizontal Carousel with Infinite Scroll)
               SliverToBoxAdapter(
-                child: _buildSectionHeader('Top Music', icon: Icons.trending_up),
+                child: _buildSectionHeader(
+                  'Top Music',
+                  icon: Icons.trending_up,
+                ),
               ),
-              SliverToBoxAdapter(
-                child: _buildTopMusicCarousel(),
-              ),
+              SliverToBoxAdapter(child: _buildTopMusicCarousel()),
 
               // Recommended For You Section (Spotify / YT Music Taste-based, max 20)
               if (_recommended.isNotEmpty || _isLoadingRecommended) ...[
@@ -707,7 +794,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               // 3. Recent Played Section (Horizontal Carousel, Max 15)
               if (_recents.isNotEmpty) ...[
                 SliverToBoxAdapter(
-                  child: _buildSectionHeader('Recently Played', badge: '${_recents.length}/15'),
+                  child: _buildSectionHeader(
+                    'Recently Played',
+                    badge: '${_recents.length}/15',
+                  ),
                 ),
                 SliverToBoxAdapter(
                   child: _buildHorizontalCarousel(
@@ -722,7 +812,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               // 4. Favorites Section (Horizontal Carousel)
               if (_favorites.isNotEmpty) ...[
                 SliverToBoxAdapter(
-                  child: _buildSectionHeader('Your Favorites', icon: Icons.favorite, iconColor: Colors.redAccent),
+                  child: _buildSectionHeader(
+                    'Your Favorites',
+                    icon: Icons.favorite,
+                    iconColor: Colors.redAccent,
+                  ),
                 ),
                 SliverToBoxAdapter(
                   child: _buildHorizontalCarousel(
@@ -737,7 +831,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               // 5. Most Played Section (Horizontal Carousel, Max 10)
               if (_mostPlayed.isNotEmpty) ...[
                 SliverToBoxAdapter(
-                  child: _buildSectionHeader('Most Played', badge: 'Top ${_mostPlayed.length}'),
+                  child: _buildSectionHeader(
+                    'Most Played',
+                    badge: 'Top ${_mostPlayed.length}',
+                  ),
                 ),
                 SliverToBoxAdapter(
                   child: _buildHorizontalCarousel(
@@ -753,21 +850,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               // Top Playlists Section (Horizontal Carousel)
               if (_topPlaylists.isNotEmpty) ...[
                 SliverToBoxAdapter(
-                  child: _buildSectionHeader('Top Playlists', icon: Icons.queue_music),
+                  child: _buildSectionHeader(
+                    'Top Playlists',
+                    icon: Icons.queue_music,
+                  ),
                 ),
-                SliverToBoxAdapter(
-                  child: _buildPlaylistsCarousel(),
-                ),
+                SliverToBoxAdapter(child: _buildPlaylistsCarousel()),
               ],
 
               // Featured Artist Albums & Discographies (Horizontal Carousel)
               if (_artistAlbums.isNotEmpty) ...[
                 SliverToBoxAdapter(
-                  child: _buildSectionHeader('Artist Spotlights & Albums', icon: Icons.album_rounded),
+                  child: _buildSectionHeader(
+                    'Artist Spotlights & Albums',
+                    icon: Icons.album_rounded,
+                  ),
                 ),
-                SliverToBoxAdapter(
-                  child: _buildArtistAlbumsCarousel(),
-                ),
+                SliverToBoxAdapter(child: _buildArtistAlbumsCarousel()),
               ],
 
               // 6. All Music Section (Vertical List at the bottom)
@@ -776,7 +875,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
                   child: Row(
                     children: const [
-                      Icon(Icons.library_music, color: AppTheme.accentLime, size: 20),
+                      Icon(
+                        Icons.library_music,
+                        color: AppTheme.accentLime,
+                        size: 20,
+                      ),
                       SizedBox(width: 8),
                       Text(
                         'All Music',
@@ -861,11 +964,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             style: const TextStyle(color: AppTheme.textPrimary),
             decoration: InputDecoration(
               hintText: 'Search songs, lyrics, artists, albums...',
-              hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+              hintStyle: const TextStyle(
+                color: AppTheme.textSecondary,
+                fontSize: 14,
+              ),
               prefixIcon: const Icon(Icons.search, color: AppTheme.accentLime),
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
-                      icon: const Icon(Icons.clear, color: AppTheme.textSecondary, size: 18),
+                      icon: const Icon(
+                        Icons.clear,
+                        color: AppTheme.textSecondary,
+                        size: 18,
+                      ),
                       onPressed: () {
                         _searchController.clear();
                         _onSearchChanged('');
@@ -873,7 +983,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     )
                   : null,
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
             ),
           ),
         ),
@@ -913,7 +1026,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildSectionHeader(String title, {IconData? icon, Color? iconColor, String? badge}) {
+  Widget _buildSectionHeader(
+    String title, {
+    IconData? icon,
+    Color? iconColor,
+    String? badge,
+  }) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Row(
@@ -944,7 +1062,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
               child: Text(
                 badge,
-                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11),
+                style: const TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 11,
+                ),
               ),
             ),
         ],
@@ -1020,10 +1141,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   artist: track.artist,
                                 );
                               },
-                              errorBuilder: (_, _, _) => _buildFallbackThumbnail(
-                                title: track.title,
-                                artist: track.artist,
-                              ),
+                              errorBuilder: (_, _, _) =>
+                                  _buildFallbackThumbnail(
+                                    title: track.title,
+                                    artist: track.artist,
+                                  ),
                             )
                           : _buildFallbackThumbnail(
                               title: track.title,
@@ -1117,7 +1239,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(color: AppTheme.accentLime, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    color: AppTheme.accentLime,
+                    strokeWidth: 2,
+                  ),
                 ),
               ),
             );
@@ -1156,10 +1281,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                   artist: track.artist,
                                 );
                               },
-                              errorBuilder: (_, _, _) => _buildFallbackThumbnail(
-                                title: track.title,
-                                artist: track.artist,
-                              ),
+                              errorBuilder: (_, _, _) =>
+                                  _buildFallbackThumbnail(
+                                    title: track.title,
+                                    artist: track.artist,
+                                  ),
                             )
                           : _buildFallbackThumbnail(
                               title: track.title,
@@ -1225,7 +1351,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 child: SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(color: AppTheme.accentLime, strokeWidth: 2),
+                  child: CircularProgressIndicator(
+                    color: AppTheme.accentLime,
+                    strokeWidth: 2,
+                  ),
                 ),
               ),
             );
@@ -1236,7 +1365,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => PlaylistScreen(playlist: playlist)),
+                MaterialPageRoute(
+                  builder: (_) => PlaylistScreen(playlist: playlist),
+                ),
               ).then((_) {
                 // Refresh only local recents and favorites when coming back
                 _loadLocalLibrary();
@@ -1259,7 +1390,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               fit: BoxFit.cover,
                               cacheWidth: 260,
                               cacheHeight: 260,
-                              errorBuilder: (_, _, _) => _buildFallbackThumbnail(),
+                              errorBuilder: (_, _, _) =>
+                                  _buildFallbackThumbnail(),
                             )
                           : _buildFallbackThumbnail(),
                     ),
@@ -1307,7 +1439,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => PlaylistScreen(playlist: album)),
+                MaterialPageRoute(
+                  builder: (_) => PlaylistScreen(playlist: album),
+                ),
               ).then((_) {
                 _loadLocalLibrary();
               });
@@ -1330,14 +1464,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                               ? Image.network(
                                   album.thumbnailUrl!,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, _, _) => _buildFallbackThumbnail(),
+                                  errorBuilder: (_, _, _) =>
+                                      _buildFallbackThumbnail(),
                                 )
                               : _buildFallbackThumbnail(),
                         ),
                       ),
                       Container(
                         margin: const EdgeInsets.all(6),
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.75),
                           borderRadius: BorderRadius.circular(6),
@@ -1349,7 +1487,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.album, size: 10, color: AppTheme.accentLime),
+                            Icon(
+                              Icons.album,
+                              size: 10,
+                              color: AppTheme.accentLime,
+                            ),
                             SizedBox(width: 3),
                             Text(
                               'ALBUM',
@@ -1492,8 +1634,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         children: [
           IconButton(
             icon: Icon(
-              track.isDownloaded ? Icons.download_done : Icons.download_outlined,
-              color: track.isDownloaded ? AppTheme.accentLime : AppTheme.textSecondary,
+              track.isDownloaded
+                  ? Icons.download_done
+                  : Icons.download_outlined,
+              color: track.isDownloaded
+                  ? AppTheme.accentLime
+                  : AppTheme.textSecondary,
               size: 20,
             ),
             onPressed: () async {
@@ -1527,14 +1673,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             },
           ),
           IconButton(
-            icon: const Icon(Icons.favorite_border, color: AppTheme.textSecondary, size: 20),
+            icon: const Icon(
+              Icons.favorite_border,
+              color: AppTheme.textSecondary,
+              size: 20,
+            ),
             onPressed: () async {
               final isFav = await _dbService.toggleFavorite(track);
               _loadAllSections();
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(isFav ? 'Added to Favorites' : 'Removed from Favorites'),
+                    content: Text(
+                      isFav ? 'Added to Favorites' : 'Removed from Favorites',
+                    ),
                     duration: const Duration(seconds: 1),
                   ),
                 );
@@ -1551,10 +1703,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     String? artist,
     double size = double.infinity,
   }) {
-    final int charCode = (title != null && title.isNotEmpty) ? title.codeUnitAt(0) : 65;
+    final int charCode = (title != null && title.isNotEmpty)
+        ? title.codeUnitAt(0)
+        : 65;
     final List<Color> gradientColors = [
       const Color(0xFF1558C9),
-      Color.lerp(const Color(0xFF030407), const Color(0xFF1558C9), (charCode % 5) / 10)!,
+      Color.lerp(
+        const Color(0xFF030407),
+        const Color(0xFF1558C9),
+        (charCode % 5) / 10,
+      )!,
       const Color(0xFF0A0F1D),
     ];
 
@@ -1567,7 +1725,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           end: Alignment.bottomRight,
           colors: gradientColors,
         ),
-        borderRadius: BorderRadius.circular(size == double.infinity ? 10 : (size * 0.16)),
+        borderRadius: BorderRadius.circular(
+          size == double.infinity ? 10 : (size * 0.16),
+        ),
         border: Border.all(
           color: AppTheme.accentLime.withValues(alpha: 0.25),
           width: 0.8,
@@ -1612,7 +1772,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return AnimatedBuilder(
       animation: _shimmerController,
       builder: (context, child) {
-        final opacity = 0.12 + (0.18 * (0.5 - (_shimmerController.value - 0.5).abs()));
+        final opacity =
+            0.12 + (0.18 * (0.5 - (_shimmerController.value - 0.5).abs()));
         return Container(
           width: 130,
           margin: const EdgeInsets.symmetric(horizontal: 6),
@@ -1657,7 +1818,8 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return AnimatedBuilder(
       animation: _shimmerController,
       builder: (context, child) {
-        final opacity = 0.12 + (0.18 * (0.5 - (_shimmerController.value - 0.5).abs()));
+        final opacity =
+            0.12 + (0.18 * (0.5 - (_shimmerController.value - 0.5).abs()));
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
@@ -1679,7 +1841,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       width: 140,
                       height: 14,
                       decoration: BoxDecoration(
-                        color: AppTheme.surfaceLight.withValues(alpha: opacity * 3),
+                        color: AppTheme.surfaceLight.withValues(
+                          alpha: opacity * 3,
+                        ),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
@@ -1688,7 +1852,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       width: 90,
                       height: 11,
                       decoration: BoxDecoration(
-                        color: AppTheme.surfaceLight.withValues(alpha: opacity * 2),
+                        color: AppTheme.surfaceLight.withValues(
+                          alpha: opacity * 2,
+                        ),
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
