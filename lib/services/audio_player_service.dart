@@ -343,7 +343,8 @@ class AudioPlayerService {
       _queueController.add(_queue);
     }
 
-    await _executePlay(track, addToHistory: true);
+    // When resetQueue is true, starting a new song from outside (Homepage/Search) must NOT leak the previous track into history!
+    await _executePlay(track, addToHistory: !resetQueue);
 
     // If resetQueue was requested and no initial queue was provided, immediately fetch a fresh, pristine radio queue
     if (resetQueue && initialQueue == null) {
