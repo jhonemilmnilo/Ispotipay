@@ -586,26 +586,57 @@ class _PlayerScreenState extends State<PlayerScreen>
                                             ),
                                           ],
                                         ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 4,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: AppTheme.accentLime
-                                                .withValues(alpha: 0.15),
-                                            borderRadius: BorderRadius.circular(
-                                              8,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            '${liveQueue.length} tracks',
-                                            style: const TextStyle(
-                                              color: AppTheme.accentLime,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
+                                        StreamBuilder<bool>(
+                                          stream: _audioService.isQueueLoadingStream,
+                                          initialData: _audioService.isQueueLoading,
+                                          builder: (context, loadingSnap) {
+                                            final isQueueLoading = (loadingSnap.data ?? false) || _isLoadingUpNext;
+
+                                            return Container(
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 8,
+                                                vertical: 4,
+                                              ),
+                                              decoration: BoxDecoration(
+                                                color: AppTheme.accentLime
+                                                    .withValues(alpha: 0.15),
+                                                borderRadius: BorderRadius.circular(
+                                                  8,
+                                                ),
+                                              ),
+                                              child: isQueueLoading
+                                                  ? Row(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      children: const [
+                                                        SizedBox(
+                                                          width: 10,
+                                                          height: 10,
+                                                          child: CircularProgressIndicator(
+                                                            strokeWidth: 1.8,
+                                                            color: AppTheme.accentLime,
+                                                          ),
+                                                        ),
+                                                        SizedBox(width: 5),
+                                                        Text(
+                                                          'Loading...',
+                                                          style: TextStyle(
+                                                            color: AppTheme.accentLime,
+                                                            fontSize: 10,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    )
+                                                  : Text(
+                                                      '${liveQueue.length} tracks',
+                                                      style: const TextStyle(
+                                                        color: AppTheme.accentLime,
+                                                        fontSize: 11,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                            );
+                                          },
                                         ),
                                       ],
                                     ),
@@ -617,9 +648,17 @@ class _PlayerScreenState extends State<PlayerScreen>
 
                                   // Unified Timeline Queue List: [Previous/History, Currently Playing, Upcoming Next with Drag & Drop]
                                   Expanded(
-                                    child: _isLoadingUpNext
-                                        ? _buildUpNextShimmerList()
-                                        : NotificationListener<
+                                    child: StreamBuilder<bool>(
+                                      stream: _audioService.isQueueLoadingStream,
+                                      initialData: _audioService.isQueueLoading,
+                                      builder: (context, loadingSnap) {
+                                        final isQueueLoading = (loadingSnap.data ?? false) || _isLoadingUpNext;
+
+                                        if (isQueueLoading && liveQueue.isEmpty) {
+                                          return _buildUpNextShimmerList();
+                                        }
+
+                                        return NotificationListener<
                                             ScrollNotification
                                           >(
                                             onNotification:
@@ -799,7 +838,9 @@ class _PlayerScreenState extends State<PlayerScreen>
                                                   ),
                                               ],
                                             ),
-                                          ),
+                                          );
+                                      },
+                                    ),
                                   ),
                                 ],
                               ),

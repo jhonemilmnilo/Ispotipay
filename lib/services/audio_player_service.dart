@@ -72,6 +72,15 @@ class AudioPlayerService {
   // Contextual Vibe memory: tracks history in current session to seed future radio chunks
   final List<Track> _recentVibeSeeds = [];
 
+  // Queue Generation ID to cancel obsolete asynchronous replenishment tasks
+  int _queueGeneration = 0;
+
+  // Realtime Queue Loading state indicator
+  bool _isQueueLoading = false;
+  bool get isQueueLoading => _isQueueLoading;
+  final _isQueueLoadingController = StreamController<bool>.broadcast();
+  Stream<bool> get isQueueLoadingStream => _isQueueLoadingController.stream;
+
   // Fixed Album/Playlist queue mode flag (disables random radio auto-replenishment)
   bool _isFixedQueueMode = false;
   bool get isFixedQueueMode => _isFixedQueueMode;
@@ -312,6 +321,8 @@ class AudioPlayerService {
   }) async {
     _isFixedQueueMode = false;
     _queueSourceTitle = null;
+    _queueGeneration++;
+    final currentGen = _queueGeneration;
 
     if (resetQueue) {
       _queue.clear();
@@ -319,16 +330,35 @@ class AudioPlayerService {
       _historyController.add(_playbackHistory);
       _queueController.add(_queue);
       _recentVibeSeeds.clear();
+      _isQueueLoading = true;
+      _isQueueLoadingController.add(true);
     }
 
     if (initialQueue != null) {
       setQueue(initialQueue);
+      _isQueueLoading = false;
+      _isQueueLoadingController.add(false);
     } else if (!resetQueue) {
       _queue.removeWhere((t) => t.id == track.id);
       _queueController.add(_queue);
     }
 
     await _executePlay(track, addToHistory: true);
+
+    // If resetQueue was requested and no initial queue was provided, immediately fetch a fresh, pristine radio queue
+    if (resetQueue && initialQueue == null) {
+      try {
+        final freshQueue = await _exploreService.getUpNextQueue(track, limit: 25);
+        if (_queueGeneration == currentGen && !_isFixedQueueMode) {
+          setQueue(freshQueue);
+        }
+      } catch (_) {} finally {
+        if (_queueGeneration == currentGen) {
+          _isQueueLoading = false;
+          _isQueueLoadingController.add(false);
+        }
+      }
+    }
   }
 
   /// Play track from an Album or Playlist with strict bounded tracks (no random songs, no omissions)
@@ -339,9 +369,12 @@ class AudioPlayerService {
   }) async {
     _isFixedQueueMode = true;
     _queueSourceTitle = sourceTitle;
+    _queueGeneration++;
 
     _playbackHistory.clear();
     _queue.clear();
+    _isQueueLoading = false;
+    _isQueueLoadingController.add(false);
 
     // Deduplicate incoming album tracks strictly by id and title
     final cleanTracks = <Track>[];
@@ -528,6 +561,7 @@ class AudioPlayerService {
   Future<void> _autoReplenishQueue() async {
     if (_isFixedQueueMode || _isAutoReplenishing || _currentTrack == null) return;
     _isAutoReplenishing = true;
+    final currentGen = _queueGeneration;
 
     try {
       // Use recent vibe context (up to 3 recent tracks) to anchor the next radio wave
@@ -536,7 +570,9 @@ class AudioPlayerService {
           : _currentTrack!;
 
       final more = await _exploreService.getUpNextQueue(anchorTrack, limit: 25);
-      appendToQueue(more);
+      if (_queueGeneration == currentGen && !_isFixedQueueMode) {
+        appendToQueue(more);
+      }
     } catch (_) {}
 
     _isAutoReplenishing = false;
@@ -573,6 +609,7 @@ class AudioPlayerService {
     _isShuffleController.close();
     _queueController.close();
     _historyController.close();
+    _isQueueLoadingController.close();
     _player.dispose();
   }
 }
