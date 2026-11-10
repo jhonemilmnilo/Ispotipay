@@ -741,7 +741,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     isLoading: false,
                     cardWidth: 130,
                     cardHeight: 205,
-                    showPlayCount: true,
+                    showPlayCount: false,
                   ),
                 ),
               ],

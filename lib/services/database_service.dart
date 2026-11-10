@@ -172,6 +172,21 @@ class DatabaseService {
     return results.map(Track.fromMap).toList();
   }
 
+  /// Get track by ID from SQLite (checks local audio_path and lyrics_path)
+  Future<Track?> getTrackById(String trackId) async {
+    final db = await database;
+    final results = await db.query(
+      'tracks',
+      where: 'id = ?',
+      whereArgs: [trackId],
+      limit: 1,
+    );
+    if (results.isNotEmpty) {
+      return Track.fromMap(results.first);
+    }
+    return null;
+  }
+
   /// Toggle Favorite
   Future<bool> toggleFavorite(Track track) async {
     final db = await database;

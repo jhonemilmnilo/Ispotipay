@@ -54,6 +54,7 @@ class _PlayerScreenState extends State<PlayerScreen>
 
     _loadLyrics(_activeTrack!);
     _checkFavoriteStatus(_activeTrack!);
+    _syncDownloadedStatus(_activeTrack!);
 
     // If AudioPlayerService already has a populated queue, use it; otherwise generate fresh (radio mode only)
     if (_audioService.queue.isNotEmpty) {
@@ -74,6 +75,7 @@ class _PlayerScreenState extends State<PlayerScreen>
           });
           _loadLyrics(newTrack);
           _checkFavoriteStatus(newTrack);
+          _syncDownloadedStatus(newTrack);
         }
       }
     });
@@ -112,6 +114,18 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (mounted) {
       setState(() {
         _isFavorite = fav;
+      });
+    }
+  }
+
+  Future<void> _syncDownloadedStatus(Track track) async {
+    final localTrack = await _dbService.getTrackById(track.id);
+    if (localTrack != null && localTrack.isDownloaded && mounted) {
+      setState(() {
+        _activeTrack = _activeTrack?.copyWith(
+          audioPath: localTrack.audioPath,
+          lyricsPath: localTrack.lyricsPath,
+        );
       });
     }
   }
