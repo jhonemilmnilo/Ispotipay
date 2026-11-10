@@ -593,19 +593,19 @@ class _PlayerScreenState extends State<PlayerScreen>
                                                 fontWeight: FontWeight.bold,
                                               ),
                                             ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              _audioService.isFixedQueueMode
-                                                  ? 'Playing from: ${_audioService.queueSourceTitle ?? "Album"}'
-                                                  : 'Playing from: Radio • Similar to ${liveCurrent?.artist ?? ''}',
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: AppTheme.textSecondary,
-                                                fontSize: 12,
-                                                height: 1.25,
+                                            if (_audioService.isFixedQueueMode &&
+                                                _audioService.queueSourceTitle != null) ...[
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                _audioService.queueSourceTitle!,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: AppTheme.textSecondary,
+                                                  fontSize: 12,
+                                                ),
                                               ),
-                                            ),
+                                            ],
                                           ],
                                         ),
                                         StreamBuilder<bool>(
