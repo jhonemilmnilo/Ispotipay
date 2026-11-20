@@ -113,7 +113,9 @@ class _PlaylistScreenState extends State<PlaylistScreen> with SingleTickerProvid
       final albums = await _dbService.getDownloadAlbums();
       if (mounted) {
         setState(() {
+          _tracks.clear();
           _tracks.addAll(downloads);
+          _downloadAlbums.clear();
           _downloadAlbums.addAll(albums);
           _isLoading = false;
           _offset = downloads.length;

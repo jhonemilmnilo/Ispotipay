@@ -213,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen>
     await _loadLocalLibrary();
 
     // 2. Load online Top & All Music
-    _fetchOnlineMusic();
+    await _fetchOnlineMusic();
   }
 
   Future<void> _fetchOnlineMusic() async {
@@ -322,9 +322,16 @@ class _HomeScreenState extends State<HomeScreen>
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: CustomScrollView(
-          controller: _scrollController,
-          slivers: [
+        child: RefreshIndicator(
+          color: AppTheme.accentLime,
+          backgroundColor: AppTheme.surface,
+          onRefresh: _loadAllSections,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: BouncingScrollPhysics(),
+            ),
+            controller: _scrollController,
+            slivers: [
             // 1. Header & Sticky Search Bar
             SliverToBoxAdapter(
               child: Padding(
@@ -933,7 +940,8 @@ class _HomeScreenState extends State<HomeScreen>
           ],
         ),
       ),
-      bottomNavigationBar: MiniPlayerBar(
+    ),
+    bottomNavigationBar: MiniPlayerBar(
         onTap: () {
           final current = AudioPlayerService().currentTrack;
           if (current != null) {

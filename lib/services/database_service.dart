@@ -284,16 +284,34 @@ class DatabaseService {
     return results.map(Track.fromMap).toList();
   }
 
-  /// Create a new Download Album
+  /// Create a new Download Album (or return existing if same name already exists)
   Future<DownloadAlbum> createDownloadAlbum(String name) async {
     final db = await database;
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      throw ArgumentError('Album name cannot be empty');
+    }
+
+    // 1. Check for existing album with the same name (case-insensitive)
+    final existing = await db.rawQuery('''
+      SELECT * FROM download_albums 
+      WHERE LOWER(TRIM(name)) = LOWER(?)
+      ORDER BY created_at ASC
+      LIMIT 1
+    ''', [trimmedName]);
+
+    if (existing.isNotEmpty) {
+      return DownloadAlbum.fromMap(existing.first);
+    }
+
+    // 2. Insert new album row
     final id = 'album_${DateTime.now().millisecondsSinceEpoch}';
     final now = DateTime.now().millisecondsSinceEpoch;
     await db.insert(
       'download_albums',
       {
         'id': id,
-        'name': name.trim(),
+        'name': trimmedName,
         'created_at': now,
       },
       conflictAlgorithm: ConflictAlgorithm.replace,
@@ -301,15 +319,55 @@ class DatabaseService {
     notifyLibraryChanged();
     return DownloadAlbum(
       id: id,
-      name: name.trim(),
+      name: trimmedName,
       createdAt: now,
       trackCount: 0,
     );
   }
 
+  /// Helper to automatically merge duplicate albums with identical names
+  Future<void> _mergeDuplicateAlbums(Database db) async {
+    try {
+      final duplicates = await db.rawQuery('''
+        SELECT LOWER(TRIM(name)) AS norm_name, COUNT(*) AS count 
+        FROM download_albums 
+        GROUP BY LOWER(TRIM(name)) 
+        HAVING count > 1
+      ''');
+
+      for (final row in duplicates) {
+        final normName = row['norm_name'] as String;
+        final albums = await db.rawQuery('''
+          SELECT id, name FROM download_albums 
+          WHERE LOWER(TRIM(name)) = ? 
+          ORDER BY created_at ASC
+        ''', [normName]);
+
+        if (albums.length > 1) {
+          final primaryId = albums.first['id'] as String;
+          for (int i = 1; i < albums.length; i++) {
+            final duplicateId = albums[i]['id'] as String;
+            // Move any songs from duplicate album to the primary album
+            await db.rawUpdate('''
+              UPDATE OR IGNORE download_album_tracks 
+              SET album_id = ? 
+              WHERE album_id = ?
+            ''', [primaryId, duplicateId]);
+
+            // Clean up and delete duplicate album
+            await db.delete('download_album_tracks', where: 'album_id = ?', whereArgs: [duplicateId]);
+            await db.delete('download_albums', where: 'id = ?', whereArgs: [duplicateId]);
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
   /// Fetch all created download albums with their song count and cover art
   Future<List<DownloadAlbum>> getDownloadAlbums() async {
     final db = await database;
+    await _mergeDuplicateAlbums(db);
+
     final results = await db.rawQuery('''
       SELECT a.id, a.name, a.created_at, 
              COUNT(dat.track_id) AS track_count,
