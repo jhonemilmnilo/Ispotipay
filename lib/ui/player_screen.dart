@@ -35,6 +35,8 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _isFavorite = false;
   bool _isDownloading = false;
   bool _isReaderMode = false;
+  bool _isResyncingLyrics = false;
+  bool _snapTeleprompterImmediately = false;
 
   List<Track> _upNextTracks = [];
   List<Track> _historyTracks = [];
@@ -923,6 +925,53 @@ class _PlayerScreenState extends State<PlayerScreen>
     }
   }
 
+  Future<void> _resyncLyrics() async {
+    final track = _activeTrack ?? widget.track;
+    if (_isResyncingLyrics) return;
+
+    setState(() {
+      _isResyncingLyrics = true;
+    });
+
+    final actualDurationMs = _audioService.player.duration?.inMilliseconds;
+    final targetDurationMs =
+        (actualDurationMs != null && actualDurationMs > 0)
+        ? actualDurationMs
+        : track.durationMs;
+
+    final freshLyrics = await _lyricsService.getLyrics(
+      track,
+      forceRefresh: true,
+      overrideDurationMs: targetDurationMs,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      if (freshLyrics.isNotEmpty) {
+        _lyrics = freshLyrics;
+      }
+      _isLoadingLyrics = false;
+      _isResyncingLyrics = false;
+      _snapTeleprompterImmediately = true;
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _snapTeleprompterImmediately = false;
+        });
+      }
+    });
+
+    AppToast.show(
+      context,
+      message: 'Lyrics resynced',
+      icon: Icons.sync_rounded,
+      iconColor: AppTheme.accentLime,
+    );
+  }
+
   int _findActiveLineIndex(Duration currentPosition) {
     if (_lyrics.isEmpty) return 0;
     int index = 0;
@@ -1180,112 +1229,198 @@ class _PlayerScreenState extends State<PlayerScreen>
                       final halfHeight = constraints.maxHeight / 2;
                       const slotHeight = 64.0;
 
-                      return RepaintBoundary(
-                        child: ShaderMask(
-                          shaderCallback: (Rect bounds) {
-                            return const LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black,
-                                Colors.black,
-                                Colors.transparent,
-                              ],
-                              stops: [0.0, 0.15, 0.85, 1.0],
-                            ).createShader(bounds);
-                          },
-                          blendMode: BlendMode.dstIn,
-                          child: StreamBuilder<Duration>(
-                            stream: _audioService.positionStream,
-                            builder: (context, snapshot) {
-                              final currentPosition =
-                                  snapshot.data ?? Duration.zero;
-                              final activeIndex = _findActiveLineIndex(
-                                currentPosition,
-                              );
+                      return Stack(
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          RepaintBoundary(
+                            child: ShaderMask(
+                              shaderCallback: (Rect bounds) {
+                                return const LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.transparent,
+                                    Colors.black,
+                                    Colors.black,
+                                    Colors.transparent,
+                                  ],
+                                  stops: [0.0, 0.15, 0.85, 1.0],
+                                ).createShader(bounds);
+                              },
+                              blendMode: BlendMode.dstIn,
+                              child: StreamBuilder<Duration>(
+                                stream: _audioService.positionStream,
+                                initialData: _audioService.player.position,
+                                builder: (context, snapshot) {
+                                  final currentPosition =
+                                      snapshot.data ??
+                                      _audioService.player.position;
+                                  final activeIndex = _findActiveLineIndex(
+                                    currentPosition,
+                                  );
 
-                              final targetOffset = (activeIndex * slotHeight);
+                                  final targetOffset =
+                                      (activeIndex * slotHeight);
 
-                              return Stack(
-                                children: [
-                                  AnimatedPositioned(
-                                    duration: const Duration(milliseconds: 350),
-                                    curve: Curves.easeOutCubic,
-                                    top:
-                                        halfHeight -
-                                        (slotHeight / 2) -
-                                        targetOffset,
-                                    left: 0,
-                                    right: 0,
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: List.generate(_lyrics.length, (
-                                        index,
-                                      ) {
-                                        final line = _lyrics[index];
-                                        final isCurrent = index == activeIndex;
+                                  return Stack(
+                                    children: [
+                                      AnimatedPositioned(
+                                        duration: _snapTeleprompterImmediately
+                                            ? Duration.zero
+                                            : const Duration(milliseconds: 350),
+                                        curve: Curves.easeOutCubic,
+                                        top:
+                                            halfHeight -
+                                            (slotHeight / 2) -
+                                            targetOffset,
+                                        left: 0,
+                                        right: 0,
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: List.generate(
+                                            _lyrics.length,
+                                            (index) {
+                                              final line = _lyrics[index];
+                                              final isCurrent =
+                                                  index == activeIndex;
 
-                                        return SizedBox(
-                                          height: slotHeight,
-                                          child: Center(
-                                            child: GestureDetector(
-                                              onTap: () {
-                                                if (line.timestamp >
-                                                    Duration.zero) {
-                                                  _audioService.seek(
-                                                    line.timestamp,
-                                                  );
-                                                }
-                                              },
-                                              child: Padding(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 32,
-                                                    ),
-                                                child: AnimatedDefaultTextStyle(
-                                                  duration: const Duration(
-                                                    milliseconds: 250,
-                                                  ),
-                                                  curve: Curves.easeOut,
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    color: isCurrent
-                                                        ? AppTheme.accentLime
-                                                        : const Color(
-                                                            0xFFADB5C4,
-                                                          ).withValues(
-                                                            alpha: 0.72,
+                                              return SizedBox(
+                                                height: slotHeight,
+                                                child: Center(
+                                                  child: GestureDetector(
+                                                    onTap: () {
+                                                      if (line.timestamp >
+                                                          Duration.zero) {
+                                                        _audioService.seek(
+                                                          line.timestamp,
+                                                        );
+                                                      }
+                                                    },
+                                                    child: Padding(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 32,
                                                           ),
-                                                    fontSize: isCurrent
-                                                        ? 22
-                                                        : 17,
-                                                    fontWeight: isCurrent
-                                                        ? FontWeight.bold
-                                                        : FontWeight.w600,
-                                                    letterSpacing: -0.3,
-                                                  ),
-                                                  child: Text(
-                                                    line.text.isEmpty
-                                                        ? '♪'
-                                                        : line.text,
-                                                    maxLines: 2,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
+                                                      child: AnimatedDefaultTextStyle(
+                                                        duration:
+                                                            const Duration(
+                                                              milliseconds: 250,
+                                                            ),
+                                                        curve: Curves.easeOut,
+                                                        textAlign:
+                                                            TextAlign.center,
+                                                        style: TextStyle(
+                                                          color: isCurrent
+                                                              ? AppTheme
+                                                                    .accentLime
+                                                              : const Color(
+                                                                  0xFFADB5C4,
+                                                                ).withValues(
+                                                                  alpha: 0.72,
+                                                                ),
+                                                          fontSize: isCurrent
+                                                              ? 22
+                                                              : 17,
+                                                          fontWeight: isCurrent
+                                                              ? FontWeight.bold
+                                                              : FontWeight.w600,
+                                                          letterSpacing: -0.3,
+                                                        ),
+                                                        child: Text(
+                                                          line.text.isEmpty
+                                                              ? '♪'
+                                                              : line.text,
+                                                          maxLines: 2,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ),
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
-                                            ),
+                                              );
+                                            },
                                           ),
-                                        );
-                                      }),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
+                                        ),
+                                      ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            ),
                           ),
-                        ),
+
+                          // Spotify-style Floating "Sync" Pill Button below Live Lyrics
+                          Positioned(
+                            bottom: 8,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: _isResyncingLyrics
+                                    ? null
+                                    : _resyncLyrics,
+                                borderRadius: BorderRadius.circular(24),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceLight.withValues(
+                                      alpha: 0.92,
+                                    ),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: AppTheme.accentLime.withValues(
+                                        alpha: 0.45,
+                                      ),
+                                      width: 1.1,
+                                    ),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Colors.black54,
+                                        blurRadius: 10,
+                                        offset: Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (_isResyncingLyrics)
+                                        const SizedBox(
+                                          width: 15,
+                                          height: 15,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: AppTheme.accentLime,
+                                          ),
+                                        )
+                                      else
+                                        const Icon(
+                                          Icons.sync_rounded,
+                                          color: AppTheme.accentLime,
+                                          size: 16,
+                                        ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _isResyncingLyrics
+                                            ? 'Syncing...'
+                                            : 'Sync Lyrics',
+                                        style: const TextStyle(
+                                          color: AppTheme.textPrimary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.3,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       );
                     },
                   );

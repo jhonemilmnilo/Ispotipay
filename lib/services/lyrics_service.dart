@@ -37,9 +37,15 @@ class LyricsService {
   }
 
   /// Fetch raw LRC content string with smart multi-tier fallback (exact -> title+artist -> title)
-  Future<String?> getRawLrcString(Track track) async {
-    // 1. Check local file if track is downloaded
-    if (track.lyricsPath != null && track.lyricsPath!.isNotEmpty) {
+  Future<String?> getRawLrcString(
+    Track track, {
+    bool forceRefresh = false,
+    int? overrideDurationMs,
+  }) async {
+    // 1. Check local file if track is downloaded and not forcing an online resync
+    if (!forceRefresh &&
+        track.lyricsPath != null &&
+        track.lyricsPath!.isNotEmpty) {
       final file = File(track.lyricsPath!);
       if (await file.exists()) {
         return await file.readAsString();
@@ -52,69 +58,75 @@ class LyricsService {
     final cleanArtist = Uri.encodeComponent(
       track.artist.split(RegExp(r'[,&]')).first.trim(),
     );
-    final durationSec = (track.durationMs / 1000).round();
+    final effectiveDurationMs =
+        (overrideDurationMs != null && overrideDurationMs > 0)
+        ? overrideDurationMs
+        : track.durationMs;
+    final durationSec = (effectiveDurationMs / 1000).round();
 
     // Tier 1: Exact match with duration (lrclib /api/get)
     try {
       final url = Uri.parse(
         'https://lrclib.net/api/get?track_name=$cleanTitle&artist_name=$cleanArtist&duration=$durationSec',
       );
-      final response = await http.get(url, headers: {
-        'User-Agent': 'ispotipay-music-player (v1.0.0)',
-      }).timeout(const Duration(seconds: 4));
+      final response = await http
+          .get(url, headers: {'User-Agent': 'ispotipay-music-player (v1.0.0)'})
+          .timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body) as Map<String, dynamic>;
         final synced = data['syncedLyrics'] as String?;
         if (synced != null && synced.trim().isNotEmpty) {
+          await _updateLocalLyricsIfNeeded(track, synced);
           return synced;
         }
-        final plain = data['plainLyrics'] as String?;
-        if (plain != null && plain.trim().isNotEmpty) {
-          return plain;
+        if (!forceRefresh) {
+          final plain = data['plainLyrics'] as String?;
+          if (plain != null && plain.trim().isNotEmpty) {
+            return plain;
+          }
         }
       }
     } catch (_) {}
 
-    // Tier 2: Match without duration constraint
-    try {
-      final url = Uri.parse(
-        'https://lrclib.net/api/get?track_name=$cleanTitle&artist_name=$cleanArtist',
-      );
-      final response = await http.get(url, headers: {
-        'User-Agent': 'ispotipay-music-player (v1.0.0)',
-      }).timeout(const Duration(seconds: 4));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        final synced = data['syncedLyrics'] as String?;
-        if (synced != null && synced.trim().isNotEmpty) {
-          return synced;
-        }
-        final plain = data['plainLyrics'] as String?;
-        if (plain != null && plain.trim().isNotEmpty) {
-          return plain;
-        }
-      }
-    } catch (_) {}
-
-    // Tier 3: Search fallback query (handles remixes, ft. artists, punctuation differences)
+    // Tier 2: Search query ranked by closest duration match for accurate sync
     try {
       final searchUrl = Uri.parse(
         'https://lrclib.net/api/search?q=$cleanTitle+$cleanArtist',
       );
-      final searchResponse = await http.get(searchUrl, headers: {
-        'User-Agent': 'ispotipay-music-player (v1.0.0)',
-      }).timeout(const Duration(seconds: 4));
+      final searchResponse = await http
+          .get(
+            searchUrl,
+            headers: {'User-Agent': 'ispotipay-music-player (v1.0.0)'},
+          )
+          .timeout(const Duration(seconds: 4));
 
       if (searchResponse.statusCode == 200) {
         final results = json.decode(searchResponse.body) as List;
+        String? bestSynced;
+        int bestDiff = 999999;
+
         for (final item in results) {
           final syncedLyrics = item['syncedLyrics'] as String?;
           if (syncedLyrics != null && syncedLyrics.trim().isNotEmpty) {
-            return syncedLyrics;
+            if (durationSec > 0 && item['duration'] != null) {
+              final itemDur = (item['duration'] as num).round();
+              final diff = (itemDur - durationSec).abs();
+              if (diff < bestDiff) {
+                bestDiff = diff;
+                bestSynced = syncedLyrics;
+              }
+            } else {
+              bestSynced ??= syncedLyrics;
+            }
           }
         }
+
+        if (bestSynced != null) {
+          await _updateLocalLyricsIfNeeded(track, bestSynced);
+          return bestSynced;
+        }
+
         for (final item in results) {
           final plainLyrics = item['plainLyrics'] as String?;
           if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
@@ -124,12 +136,62 @@ class LyricsService {
       }
     } catch (_) {}
 
+    // Tier 3: Match without duration constraint
+    try {
+      final url = Uri.parse(
+        'https://lrclib.net/api/get?track_name=$cleanTitle&artist_name=$cleanArtist',
+      );
+      final response = await http
+          .get(url, headers: {'User-Agent': 'ispotipay-music-player (v1.0.0)'})
+          .timeout(const Duration(seconds: 4));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final synced = data['syncedLyrics'] as String?;
+        if (synced != null && synced.trim().isNotEmpty) {
+          await _updateLocalLyricsIfNeeded(track, synced);
+          return synced;
+        }
+        final plain = data['plainLyrics'] as String?;
+        if (plain != null && plain.trim().isNotEmpty) {
+          return plain;
+        }
+      }
+    } catch (_) {}
+
+    // Fallback to local file if forceRefresh failed due to offline state
+    if (forceRefresh &&
+        track.lyricsPath != null &&
+        track.lyricsPath!.isNotEmpty) {
+      final file = File(track.lyricsPath!);
+      if (await file.exists()) {
+        return await file.readAsString();
+      }
+    }
+
     return null;
   }
 
+  Future<void> _updateLocalLyricsIfNeeded(Track track, String rawLyrics) async {
+    if (track.lyricsPath != null && track.lyricsPath!.isNotEmpty) {
+      try {
+        final file = File(track.lyricsPath!);
+        await file.writeAsString(rawLyrics.trim());
+      } catch (_) {}
+    }
+  }
+
   /// Fetch lyrics: Checks local file first (offline support), then multi-tier LRCLIB query
-  Future<List<LyricLine>> getLyrics(Track track) async {
-    final rawLrc = await getRawLrcString(track);
+  Future<List<LyricLine>> getLyrics(
+    Track track, {
+    bool forceRefresh = false,
+    int? overrideDurationMs,
+  }) async {
+    final rawLrc = await getRawLrcString(
+      track,
+      forceRefresh: forceRefresh,
+      overrideDurationMs: overrideDurationMs,
+    );
     if (rawLrc != null && rawLrc.trim().isNotEmpty) {
       final parsed = parseLrc(rawLrc);
       if (parsed.isNotEmpty) return parsed;
