@@ -10,6 +10,7 @@ import '../services/lyrics_service.dart';
 import '../services/music_explore_service.dart';
 import 'app_theme.dart';
 import 'widgets/app_toast.dart';
+import 'widgets/download_album_picker_sheet.dart';
 
 class PlayerScreen extends StatefulWidget {
   final Track track;
@@ -951,10 +952,14 @@ class _PlayerScreenState extends State<PlayerScreen>
 
     if (_isDownloading) return;
 
+    final selectedAlbumId = await DownloadAlbumPickerSheet.show(context, track);
+    if (selectedAlbumId == null) return;
+
     setState(() {
       _isDownloading = true;
     });
 
+    if (!mounted) return;
     AppToast.show(
       context,
       message: 'Downloading "${track.title}"...',
@@ -962,7 +967,10 @@ class _PlayerScreenState extends State<PlayerScreen>
       iconColor: AppTheme.primary,
     );
 
-    final downloaded = await DownloadService().downloadTrack(track);
+    final downloaded = await DownloadService().downloadTrack(
+      track,
+      albumId: selectedAlbumId == 'general' ? null : selectedAlbumId,
+    );
 
     if (mounted) {
       setState(() {

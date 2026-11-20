@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import '../models/download_album.dart';
 import '../models/track.dart';
 
 class DatabaseService {
@@ -82,6 +83,47 @@ class DatabaseService {
           CREATE TABLE recents (
             track_id TEXT PRIMARY KEY,
             played_at INTEGER NOT NULL,
+            FOREIGN KEY (track_id) REFERENCES tracks (id) ON DELETE CASCADE
+          )
+        ''');
+
+        // Download albums table
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS download_albums (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+          )
+        ''');
+
+        // Download album tracks join table
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS download_album_tracks (
+            album_id TEXT NOT NULL,
+            track_id TEXT NOT NULL,
+            added_at INTEGER NOT NULL,
+            PRIMARY KEY (album_id, track_id),
+            FOREIGN KEY (album_id) REFERENCES download_albums (id) ON DELETE CASCADE,
+            FOREIGN KEY (track_id) REFERENCES tracks (id) ON DELETE CASCADE
+          )
+        ''');
+      },
+      onOpen: (db) async {
+        // Ensure download album tables exist on legacy database versions
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS download_albums (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            created_at INTEGER NOT NULL
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS download_album_tracks (
+            album_id TEXT NOT NULL,
+            track_id TEXT NOT NULL,
+            added_at INTEGER NOT NULL,
+            PRIMARY KEY (album_id, track_id),
+            FOREIGN KEY (album_id) REFERENCES download_albums (id) ON DELETE CASCADE,
             FOREIGN KEY (track_id) REFERENCES tracks (id) ON DELETE CASCADE
           )
         ''');
@@ -239,6 +281,122 @@ class DatabaseService {
       limit: limit,
       offset: offset,
     );
+    return results.map(Track.fromMap).toList();
+  }
+
+  /// Create a new Download Album
+  Future<DownloadAlbum> createDownloadAlbum(String name) async {
+    final db = await database;
+    final id = 'album_${DateTime.now().millisecondsSinceEpoch}';
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await db.insert(
+      'download_albums',
+      {
+        'id': id,
+        'name': name.trim(),
+        'created_at': now,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    notifyLibraryChanged();
+    return DownloadAlbum(
+      id: id,
+      name: name.trim(),
+      createdAt: now,
+      trackCount: 0,
+    );
+  }
+
+  /// Fetch all created download albums with their song count and cover art
+  Future<List<DownloadAlbum>> getDownloadAlbums() async {
+    final db = await database;
+    final results = await db.rawQuery('''
+      SELECT a.id, a.name, a.created_at, 
+             COUNT(dat.track_id) AS track_count,
+             (
+               SELECT t.thumbnail_url 
+               FROM tracks t 
+               INNER JOIN download_album_tracks dat2 ON t.id = dat2.track_id 
+               WHERE dat2.album_id = a.id AND t.thumbnail_url IS NOT NULL AND t.thumbnail_url != ""
+               ORDER BY dat2.added_at DESC
+               LIMIT 1
+             ) AS cover_url
+      FROM download_albums a
+      LEFT JOIN download_album_tracks dat ON a.id = dat.album_id
+      GROUP BY a.id
+      ORDER BY a.created_at DESC
+    ''');
+    return results.map(DownloadAlbum.fromMap).toList();
+  }
+
+  /// Get a single album by ID
+  Future<DownloadAlbum?> getDownloadAlbumById(String albumId) async {
+    final db = await database;
+    final results = await db.rawQuery('''
+      SELECT a.id, a.name, a.created_at, 
+             COUNT(dat.track_id) AS track_count,
+             (
+               SELECT t.thumbnail_url 
+               FROM tracks t 
+               INNER JOIN download_album_tracks dat2 ON t.id = dat2.track_id 
+               WHERE dat2.album_id = a.id AND t.thumbnail_url IS NOT NULL AND t.thumbnail_url != ""
+               LIMIT 1
+             ) AS cover_url
+      FROM download_albums a
+      LEFT JOIN download_album_tracks dat ON a.id = dat.album_id
+      WHERE a.id = ?
+      GROUP BY a.id
+      LIMIT 1
+    ''', [albumId]);
+    if (results.isNotEmpty) {
+      return DownloadAlbum.fromMap(results.first);
+    }
+    return null;
+  }
+
+  /// Add a downloaded track to a specific album
+  Future<void> addTrackToDownloadAlbum(String albumId, String trackId) async {
+    final db = await database;
+    await db.insert(
+      'download_album_tracks',
+      {
+        'album_id': albumId,
+        'track_id': trackId,
+        'added_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    notifyLibraryChanged();
+  }
+
+  /// Remove a track from an album
+  Future<void> removeTrackFromDownloadAlbum(String albumId, String trackId) async {
+    final db = await database;
+    await db.delete(
+      'download_album_tracks',
+      where: 'album_id = ? AND track_id = ?',
+      whereArgs: [albumId, trackId],
+    );
+    notifyLibraryChanged();
+  }
+
+  /// Delete an album (does NOT delete the downloaded audio file itself)
+  Future<void> deleteDownloadAlbum(String albumId) async {
+    final db = await database;
+    await db.delete('download_album_tracks', where: 'album_id = ?', whereArgs: [albumId]);
+    await db.delete('download_albums', where: 'id = ?', whereArgs: [albumId]);
+    notifyLibraryChanged();
+  }
+
+  /// Get all tracks inside a specific download album
+  Future<List<Track>> getTracksForAlbum(String albumId) async {
+    final db = await database;
+    final results = await db.rawQuery('''
+      SELECT t.* FROM tracks t
+      INNER JOIN download_album_tracks dat ON t.id = dat.track_id
+      WHERE dat.album_id = ? AND t.audio_path IS NOT NULL AND t.audio_path != ""
+      ORDER BY dat.added_at DESC
+    ''', [albumId]);
     return results.map(Track.fromMap).toList();
   }
 

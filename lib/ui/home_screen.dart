@@ -11,6 +11,7 @@ import 'mini_player_bar.dart';
 import 'player_screen.dart';
 import 'playlist_screen.dart';
 import 'widgets/app_toast.dart';
+import 'widgets/download_album_picker_sheet.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1653,6 +1654,9 @@ class _HomeScreenState extends State<HomeScreen>
                 return;
               }
 
+              final selectedAlbumId = await DownloadAlbumPickerSheet.show(context, track);
+              if (selectedAlbumId == null || !mounted) return;
+
               AppToast.show(
                 context,
                 message: 'Downloading "${track.title}"...',
@@ -1660,7 +1664,10 @@ class _HomeScreenState extends State<HomeScreen>
                 iconColor: AppTheme.primary,
               );
 
-              final downloaded = await DownloadService().downloadTrack(track);
+              final downloaded = await DownloadService().downloadTrack(
+                track,
+                albumId: selectedAlbumId == 'general' ? null : selectedAlbumId,
+              );
               if (downloaded != null && mounted) {
                 _loadAllSections();
                 AppToast.show(

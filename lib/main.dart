@@ -1,8 +1,14 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:audio_service/audio_service.dart';
+import 'services/audio_handler.dart';
 import 'ui/app_theme.dart';
 import 'ui/home_screen.dart';
 
-void main() {
+AudioPlayerHandler? audioHandler;
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Optimization for Low-End Devices:
@@ -10,6 +16,24 @@ void main() {
   // and maximum 100 images to prevent Out-Of-Memory (OOM) crashes on 2GB RAM phones.
   PaintingBinding.instance.imageCache.maximumSize = 100;
   PaintingBinding.instance.imageCache.maximumSizeBytes = 30 * 1024 * 1024;
+
+  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+    try {
+      audioHandler = await AudioService.init(
+        builder: () => AudioPlayerHandler(),
+        config: const AudioServiceConfig(
+          androidNotificationChannelId: 'com.example.ispotipay.channel.audio',
+          androidNotificationChannelName: 'Ispotipay Music Playback',
+          androidNotificationOngoing: true,
+          androidStopForegroundOnPause: true,
+          androidNotificationIcon: 'mipmap/launcher_icon',
+          androidShowNotificationBadge: true,
+        ),
+      );
+    } catch (e) {
+      debugPrint('[AudioService] Init error: $e');
+    }
+  }
 
   runApp(const IspotipayApp());
 }

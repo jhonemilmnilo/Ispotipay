@@ -21,6 +21,7 @@ class DownloadService {
   /// Download both the audio stream (.m4a) and the companion synchronized lyrics (.lrc)
   Future<Track?> downloadTrack(
     Track track, {
+    String? albumId,
     Function(double progress)? onProgress,
   }) async {
     try {
@@ -83,6 +84,11 @@ class DownloadService {
         lyricsPath: savedLyricsPath,
       );
       await _dbService.saveTrack(updatedTrack);
+
+      if (albumId != null && albumId.isNotEmpty && albumId != 'general') {
+        await _dbService.addTrackToDownloadAlbum(albumId, track.id);
+      }
+      _dbService.notifyLibraryChanged();
 
       return updatedTrack;
     } catch (_) {
